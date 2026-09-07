@@ -1,0 +1,92 @@
+# Офлайн-демо: цены берутся из файла фикстур и справочника наземных плеч,
+# сеть не используется. Запуск: tbs-tracker -c config/demo.yaml run
+search:
+  origins: [MOW, LED, AER, MRV, OGZ]
+  destinations: [TBS]
+  entry_points: [TBS, KUT, BUS]
+  hubs: [EVN, IST]
+  max_legs: 3
+  detour_factor: 2.4
+  passengers: 1
+  top_n: 12
+  windows:
+    - date_from: 2026-10-05
+      date_to: 2026-10-09
+
+connections:
+  min_self_transfer_min: 210
+  min_airport_change_min: 330
+  min_border_min: 240
+  min_ground_min: 90
+  max_layover_min: 1440
+  overnight_threshold_min: 480
+
+costs:
+  airport_transfer_rub: 600
+  overnight_rub: 3500
+  baggage_rub: 3000
+  need_baggage: true
+  time_value_rub_per_hour: 150
+  self_transfer_failure_prob: 0.06
+  rebooking_cost_rub: 12000
+  tour_accommodation_rub_per_night: 3000
+
+filters:
+  sanity_min_price_rub: 1500
+  sanity_max_price_rub: 250000
+  max_total_duration_hours: 48
+
+providers:
+  fixtures:
+    enabled: true
+    path: data/fixtures/demo_offers.json
+  ground:
+    enabled: true
+    legs:
+      - origin: OGZ
+        destination: TBS
+        mode: bus
+        carrier: Trans Kavkaz
+        price_rub: 1500
+        price_min_rub: 700
+        price_max_rub: 2400
+        duration_min: 240
+        border_buffer_min: 120
+        flexible: true
+        payment_channel: cash
+        note: "маршрутка через КПП Верхний Ларс"
+      - origin: EVN
+        destination: TBS
+        mode: bus
+        price_rub: 1600
+        duration_min: 360
+        departures: ["08:00", "14:00", "22:00"]
+        payment_channel: cash
+        note: "автобус Ереван-Тбилиси"
+      - origin: KUT
+        destination: TBS
+        mode: train
+        price_rub: 900
+        duration_min: 250
+        departures: ["07:30", "17:20"]
+        payment_channel: cash
+        note: "поезд Кутаиси-Тбилиси"
+
+alerts:
+  target_price_rub: 9000
+  drop_pct: 15
+  percentile: 10
+  min_observations: 5
+  cooldown_hours: 12
+  channels:
+    console:
+      enabled: true
+
+runtime:
+  db_path: data/demo.sqlite3
+  cache_dir: .cache/demo
+  cache_ttl_minutes: 0
+  max_requests_per_run: 50
+  max_workers: 4
+  fx:
+    mode: static
