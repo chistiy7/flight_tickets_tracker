@@ -46,7 +46,7 @@ def render_table(
         itineraries = best_variants(itineraries)
     header = (
         f"{'Маршрут':<26}{'Вылет':<13}{'В пути':<10}{'Цена':>10}"
-        f"{'Заплатить':>11}{'С зачётом':>11}{'Кл':>4}  Источники / флаги"
+        f"{'Заплатить':>11}{'Кл':>4}  Источники / флаги"
     )
     lines = [header, "-" * len(header)]
     for itinerary in itineraries[:limit]:
@@ -54,13 +54,11 @@ def render_table(
         extras = ", ".join(itinerary.sources)
         if itinerary.flags:
             extras = f"{extras} | {', '.join(itinerary.flags)}"
-        cost = itinerary.cost
-        credited = f"{cost.value_rub:>11.0f}" if cost.applied_credit_rub else f"{'—':>11}"
         lines.append(
             f"{route:<26}{fmt_dt(itinerary.depart):<13}"
             f"{fmt_duration(itinerary.total_duration_min):<10}"
             f"{itinerary.tickets_rub:>10.0f}"
-            f"{cost.out_of_pocket_rub:>11.0f}{credited}"
+            f"{itinerary.cost.out_of_pocket_rub:>11.0f}"
             f"{itinerary.chain_class:>4}  {extras}"
         )
     return "\n".join(lines)
@@ -87,17 +85,8 @@ def render_details(itinerary: Itinerary) -> str:
         "= {out_of_pocket_rub:.0f}₽ к оплате".format(**cost)
     )
     included = _describe_included(itinerary)
-    if included and itinerary.cost.applied_credit_rub:
-        lines.append(
-            f"  в цену входит: {included} — зачтено "
-            f"{itinerary.cost.applied_credit_rub:.0f}₽, полезная стоимость "
-            f"{itinerary.cost.value_rub:.0f}₽"
-        )
-    elif included:
-        lines.append(
-            f"  в цену входит: {included} — не зачтено, сравнение как за билет "
-            "в одну сторону"
-        )
+    if included:
+        lines.append(f"  в цену также входит: {included} (в сравнении не учитывается)")
     lines.append(f"  для ранжирования (риск + время): {cost['generalized_rub']:.0f}₽")
     if itinerary.flags:
         lines.append(f"  флаги: {', '.join(itinerary.flags)}")
@@ -105,7 +94,7 @@ def render_details(itinerary: Itinerary) -> str:
 
 
 def _describe_included(itinerary: Itinerary) -> str:
-    """Что входит в цену сверх нужного нам перелёта в одну сторону."""
+    """Что едет в пакете сверх нужного нам перелёта. Справочно, на цену не влияет."""
     nights = sum(leg.nights_included for leg in itinerary.legs)
     parts = []
     if any(leg.return_flight_included for leg in itinerary.legs):
@@ -137,18 +126,15 @@ def render_run_report(
         lines = ["", "Лучшее по классам цепочек:"]
         for chain_class in sorted(best_by_class):
             itinerary = best_by_class[chain_class]
-            extra = ""
-            if itinerary.cost.applied_credit_rub:
-                extra = f" (с зачётом проживания {itinerary.cost.value_rub:.0f}₽)"
             lines.append(
                 f"  {chain_class} ({CLASS_TITLES.get(chain_class, '')}): "
-                f"{' → '.join(itinerary.path)} — {itinerary.cost.out_of_pocket_rub:.0f}₽"
-                f"{extra}, {fmt_duration(itinerary.total_duration_min)}"
+                f"{' → '.join(itinerary.path)} — {itinerary.cost.out_of_pocket_rub:.0f}₽, "
+                f"{fmt_duration(itinerary.total_duration_min)}"
             )
         blocks.append("\n".join(lines))
 
-    # Ранжирование учитывает риск, время и зачёт проживания, поэтому минимум по
-    # фактической оплате может быть другим вариантом — показываем его отдельно.
+    # Ранжирование учитывает риск и время, поэтому минимум по фактической оплате
+    # может быть другим вариантом — показываем его отдельно.
     cheapest = min(itineraries, key=lambda it: it.cost.out_of_pocket_rub)
     if cheapest is not itineraries[0]:
         blocks.append(
@@ -250,7 +236,6 @@ def render_json(itineraries: Sequence[Itinerary]) -> str:
                     "deep_link": leg.deep_link,
                     "nights_included": leg.nights_included,
                     "return_flight_included": leg.return_flight_included,
-                    "bundle_credit_rub": leg.bundle_credit_rub,
                     "notes": leg.notes,
                 }
                 for leg in itinerary.legs

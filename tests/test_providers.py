@@ -197,9 +197,8 @@ def _tour_query() -> LegQuery:
 
 
 def test_tourvisor_keeps_actual_package_price(base_config, monkeypatch):
-    """Цена плеча — это цена пакета, а не «эквивалент билета» после вычетов."""
+    """Цена плеча — это цена пакета, без всяких пересчётов на включённое."""
     monkeypatch.setenv("TV", "jwt")
-    base_config.costs.trip_nights = 0
     provider = _tourvisor(base_config, FakeHttp(_hot_tour_payload(price=20000, nights=7)))
     result = provider.safe_fetch(_tour_query())
 
@@ -209,25 +208,12 @@ def test_tourvisor_keeps_actual_package_price(base_config, monkeypatch):
     assert leg.mode == Mode.TOUR
     assert leg.nights_included == 7
     assert leg.return_flight_included is True
-    # Без потребности в отеле зачёта нет: сравниваем ровно то, что платим.
-    assert leg.bundle_credit_rub == 0
     assert "20000" in leg.notes
 
 
-def test_tourvisor_credits_only_needed_nights(base_config, monkeypatch):
-    monkeypatch.setenv("TV", "jwt")
-    base_config.costs.trip_nights = 3
-    provider = _tourvisor(base_config, FakeHttp(_hot_tour_payload(price=20000, nights=7)))
-    leg = provider.safe_fetch(_tour_query()).legs[0]
-    # Нужны 3 ночи из 7 включённых → зачёт 3 × 3000 ₽, цена пакета не меняется.
-    assert leg.price_rub == pytest.approx(20000)
-    assert leg.bundle_credit_rub == pytest.approx(9000)
-
-
-def test_tourvisor_does_not_drop_tours_cheaper_than_accommodation(base_config, monkeypatch):
+def test_tourvisor_keeps_tours_cheaper_than_their_hotel(base_config, monkeypatch):
     """Пакет за 12 000 ₽ на 7 ночей — самый интересный случай, он не должен теряться."""
     monkeypatch.setenv("TV", "jwt")
-    base_config.costs.trip_nights = 7
     provider = _tourvisor(base_config, FakeHttp(_hot_tour_payload(price=12000, nights=7)))
     legs = provider.safe_fetch(_tour_query()).legs
     assert len(legs) == 1

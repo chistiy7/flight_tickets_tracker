@@ -54,7 +54,7 @@ def test_offline_run_builds_chains_and_history(demo_config):
 
 
 def test_hot_tour_can_beat_dry_ticket(demo_config):
-    """Горячий тур с вычетом проживания обгоняет сухой билет из Москвы."""
+    """Горячий тур обгоняет сухой билет из Москвы просто по цене пакета."""
     report = run_tracker(demo_config, notify=False)
     from_moscow = [it for it in report.itineraries if it.origin == "MOW"]
     assert from_moscow[0].chain_class == "E"

@@ -12,7 +12,6 @@ from typing import Any
 
 from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import parse_dt
-from ..tours import bundle_credit_rub
 from .base import Provider, now_utc, register
 
 
@@ -80,11 +79,6 @@ class FixturesProvider(Provider):
                     flexible=bool(item.get("flexible", False)),
                     nights_included=nights,
                     return_flight_included=return_included,
-                    bundle_credit_rub=bundle_credit_rub(
-                        nights_included=nights,
-                        return_included=return_included,
-                        costs=self.config.costs,
-                    ),
                     deep_link=item.get("deep_link"),
                     observed_at=observed,
                     notes=item.get("notes"),

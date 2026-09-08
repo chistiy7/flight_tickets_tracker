@@ -3,7 +3,8 @@
 Российская специфика: чартерный/блочный пакет в Грузию иногда дешевле сухого билета,
 потому что туроператор сливает непроданные места. Пакет попадает в выдачу со своей
 фактической ценой и конкурирует с билетами напрямую: тур за 20 000 ₽ выгоднее билета
-за 25 000 ₽, даже если отель вам не нужен. Логика зачёта проживания — в `tours.py`.
+за 25 000 ₽, даже если отель вам не нужен. Почему сравнение идёт по телу тура — в
+`tours.py`.
 
 Доступ: JWT из ЛК турагента в заголовке `Authorization: Bearer ...`, разделы
 оплачиваются отдельно, лимит 3000 поисков/сутки.
@@ -18,7 +19,7 @@ from typing import Any
 
 from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult, TourOffer
 from ..timeutil import parse_dt
-from ..tours import bundle_credit_rub, describe_package
+from ..tours import describe_package
 from .base import Provider, now_utc, register
 
 API_ROOT = "https://api.tourvisor.ru/search"
@@ -57,14 +58,8 @@ class TourvisorProvider(Provider):
         for tour in tours:
             if tour.price_rub <= 0:
                 continue
-            # Цена плеча — это цена пакета целиком: столько денег реально уходит.
-            # Проживание не вычитается, иначе сравнение перестаёт быть сравнением
-            # того, что вы платите.
-            credit = bundle_credit_rub(
-                nights_included=tour.nights,
-                return_included=True,
-                costs=self.config.costs,
-            )
+            # Цена плеча — цена пакета целиком: столько денег реально уходит, и
+            # именно она конкурирует с ценами билетов.
             legs.append(
                 Leg(
                     origin=tour.origin,
@@ -82,13 +77,11 @@ class TourvisorProvider(Provider):
                     baggage_included=True,
                     nights_included=tour.nights,
                     return_flight_included=True,
-                    bundle_credit_rub=credit,
                     deep_link=tour.deep_link,
                     observed_at=observed,
                     notes=describe_package(
                         price_rub=tour.price_rub,
                         nights=tour.nights,
-                        credit_rub=credit,
                         hotel=tour.hotel,
                         price_old_rub=tour.price_old_rub,
                     ),
