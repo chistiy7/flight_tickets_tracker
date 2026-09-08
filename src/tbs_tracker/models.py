@@ -35,6 +35,25 @@ class PaymentChannel(str, Enum):
     CASH = "cash"
 
 
+class LinkKind(str, Enum):
+    """Куда ведёт ссылка на оффер — от этого зависит, что делать дальше.
+
+    Разница практическая: по `BOOKING` покупают, по `SEARCH` ещё нужно найти нужный
+    рейс среди выдачи (и цена может отличаться), а `INFO` вообще не про покупку.
+    """
+
+    BOOKING = "booking"
+    SEARCH = "search"
+    INFO = "info"
+
+
+LINK_LABELS = {
+    LinkKind.BOOKING: "купить",
+    LinkKind.SEARCH: "искать",
+    LinkKind.INFO: "смотреть",
+}
+
+
 @dataclass(frozen=True)
 class LegQuery:
     """Запрос цен на одно плечо в окне дат."""
@@ -77,6 +96,9 @@ class Leg:
     baggage_included: bool = False
     transfers: int = 0
     deep_link: str | None = None
+    link_kind: LinkKind = LinkKind.SEARCH
+    #: Как покупать, когда кликабельной ссылки нет (номер оффера, канал брони).
+    booking_ref: str | None = None
     observed_at: datetime | None = None
     # Плечо без жёсткого расписания (маршрутки «по заполнению», такси).
     flexible: bool = False
@@ -130,6 +152,21 @@ class Leg:
         if self.flight_number:
             who = f"{who} {self.flight_number}"
         return f"{self.origin}→{self.destination} {when} {who} {self.price_rub:.0f}₽"
+
+    def where_to_buy(self) -> str:
+        """Где купить именно это плечо.
+
+        Плечи цепочки покупаются по отдельности, поэтому ссылка нужна у каждого.
+        И поисковую выдачу нельзя выдавать за готовую бронь: по кэшированной цене
+        Aviasales рейс ещё предстоит найти, а карточка отеля от Tourvisor к
+        покупке пакета не ведёт вовсе.
+        """
+        if self.deep_link:
+            line = f"{LINK_LABELS[self.link_kind]}: {self.deep_link}"
+            return f"{line} ({self.booking_ref})" if self.booking_ref else line
+        if self.booking_ref:
+            return f"купить: {self.booking_ref}"
+        return f"купить: прямой ссылки нет, искать у источника {self.source}"
 
 
 @dataclass

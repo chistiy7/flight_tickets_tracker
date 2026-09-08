@@ -17,7 +17,16 @@ import time
 from datetime import date
 from typing import Any
 
-from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult, TourOffer
+from ..models import (
+    Leg,
+    LegQuery,
+    LinkKind,
+    Mode,
+    PaymentChannel,
+    PriceKind,
+    ProviderResult,
+    TourOffer,
+)
 from ..timeutil import parse_dt
 from ..tours import describe_package
 from .base import Provider, now_utc, register
@@ -77,7 +86,11 @@ class TourvisorProvider(Provider):
                     baggage_included=True,
                     nights_included=tour.nights,
                     return_flight_included=True,
+                    # Tourvisor отдаёт карточку отеля, а не корзину: пакет
+                    # бронируется у агента по номеру тура.
                     deep_link=tour.deep_link,
+                    link_kind=LinkKind.INFO,
+                    booking_ref=_tour_booking_ref(tour),
                     observed_at=observed,
                     notes=describe_package(
                         price_rub=tour.price_rub,
@@ -198,6 +211,14 @@ class TourvisorProvider(Provider):
         if region and region in mapping:
             return str(mapping[region])
         return query.destination
+
+
+def _tour_booking_ref(tour: TourOffer) -> str:
+    tour_id = tour.raw.get("tourId")
+    who = tour.operator or "туроператор"
+    if tour_id:
+        return f"тур №{tour_id} ({who}) — бронируется у агента, ссылка ведёт на отель"
+    return f"пакет {who} — бронируется у агента, ссылка ведёт на отель"
 
 
 def _as_date(value: Any) -> date | None:

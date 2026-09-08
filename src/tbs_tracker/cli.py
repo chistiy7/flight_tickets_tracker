@@ -35,6 +35,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_cmd = sub.add_parser("run", help="прогон: цены, цепочки, алерты")
     run_cmd.add_argument("--limit", type=int, default=None, help="сколько вариантов показать")
+    run_cmd.add_argument(
+        "--details",
+        type=int,
+        default=3,
+        help="для скольких вариантов расписать плечи и ссылки на покупку",
+    )
     run_cmd.add_argument("--json", action="store_true", help="вывести результат в JSON")
     run_cmd.add_argument("--no-alerts", action="store_true", help="не отправлять уведомления")
     run_cmd.add_argument("--no-store", action="store_true", help="не писать историю в БД")
@@ -97,6 +103,7 @@ def _cmd_run(config: Config, args: argparse.Namespace) -> int:
                 report.stats,
                 report.provider_results,
                 limit=limit,
+                details=args.details,
             )
         )
         print(f"\nЗапросов израсходовано: {report.requests_used}")

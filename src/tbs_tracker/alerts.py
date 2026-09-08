@@ -119,14 +119,13 @@ def _render(itinerary: Itinerary, reason: str) -> str:
         lines.append(f"  • {leg.describe()} [{leg.source}]")
         if leg.nights_included and leg.notes:
             lines.append(f"      {leg.notes}")
+        lines.append(f"      {leg.where_to_buy()}")
     if itinerary.price_kind != PriceKind.LIVE:
         lines.append(
             "  ! цена не живая (кэш/оценка) — подтвердите на сайте перевозчика перед покупкой"
         )
     if itinerary.flags:
         lines.append(f"  флаги: {', '.join(itinerary.flags)}")
-    links = [leg.deep_link for leg in itinerary.legs if leg.deep_link]
-    lines.extend(f"  ссылка: {link}" for link in links)
     return "\n".join(lines)
 
 

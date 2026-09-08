@@ -1,99 +1,117 @@
 {
-  "_comment": "Демо-данные, приближённые к реальным ценам осени 2026. Не тарифы к покупке.",
+  "_comment": "Демо-данные, приближённые к реальным ценам осени 2026. Не тарифы к покупке. Ссылки вымышленные, но показывают разные типы: booking — покупка, search — выдача, info — описание.",
   "legs": [
     {
       "origin": "MOW", "destination": "TBS", "mode": "air", "carrier": "A4",
       "flight_number": "A47007", "depart": "2026-10-06T08:40", "duration_min": 200,
       "price": 14154, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
-      "notes": "Азимут, Внуково"
+      "notes": "Азимут, Внуково",
+      "deep_link": "https://www.aviasales.ru/search/MOW0610TBS1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "TBS", "mode": "air", "carrier": "WZ",
       "flight_number": "WZ565", "depart": "2026-10-07T17:00", "duration_min": 195,
       "price": 13806, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
-      "notes": "Red Wings, Жуковский"
+      "notes": "Red Wings, Жуковский",
+      "deep_link": "https://www.aviasales.ru/search/MOW0710TBS1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "TBS", "mode": "air", "carrier": "A9",
       "flight_number": "A9552", "depart": "2026-10-08T05:30", "duration_min": 170,
       "price": 21216, "currency": "RUB", "price_kind": "live", "source": "airline_direct",
-      "baggage_included": true, "notes": "Georgian Airways, прямая продажа"
+      "baggage_included": true, "notes": "Georgian Airways, прямая продажа",
+      "deep_link": "https://www.georgian-airways.com/booking", "link_kind": "booking"
     },
     {
       "origin": "AER", "destination": "TBS", "mode": "air", "carrier": "WZ",
       "flight_number": "WZ557", "depart": "2026-10-06T06:30", "duration_min": 85,
       "price": 6891, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
-      "notes": "Red Wings, Адлер"
+      "notes": "Red Wings, Адлер",
+      "deep_link": "https://www.aviasales.ru/search/AER0610TBS1", "link_kind": "search"
     },
     {
       "origin": "MRV", "destination": "TBS", "mode": "air", "carrier": "A4",
       "flight_number": "A46181", "depart": "2026-10-07T23:55", "duration_min": 70,
       "price": 7902, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
-      "notes": "Азимут, по выходным"
+      "notes": "Азимут, по выходным",
+      "deep_link": "https://www.aviasales.ru/search/MRV0710TBS1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "OGZ", "mode": "air", "carrier": "DP",
       "flight_number": "DP6011", "depart": "2026-10-05T09:20", "duration_min": 165,
       "price": 6500, "currency": "RUB", "price_kind": "live", "source": "airline_direct",
-      "notes": "Победа, без багажа"
+      "notes": "Победа, без багажа",
+      "deep_link": "https://www.flypobeda.ru/booking", "link_kind": "booking"
     },
     {
       "origin": "MOW", "destination": "OGZ", "mode": "air", "carrier": "A4",
       "flight_number": "A4361", "depart": "2026-10-06T13:10", "duration_min": 170,
-      "price": 7400, "currency": "RUB", "price_kind": "cached", "source": "aviasales"
+      "price": 7400, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
+      "deep_link": "https://www.aviasales.ru/search/MOW0610OGZ1", "link_kind": "search"
     },
     {
       "origin": "LED", "destination": "OGZ", "mode": "air", "carrier": "DP",
       "flight_number": "DP6721", "depart": "2026-10-05T10:00", "duration_min": 210,
-      "price": 8900, "currency": "RUB", "price_kind": "cached", "source": "aviasales"
+      "price": 8900, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
+      "deep_link": "https://www.aviasales.ru/search/LED0510OGZ1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "AER", "mode": "air", "carrier": "DP",
       "flight_number": "DP401", "depart": "2026-10-05T07:10", "duration_min": 145,
-      "price": 4200, "currency": "RUB", "price_kind": "cached", "source": "aviasales"
+      "price": 4200, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
+      "deep_link": "https://www.aviasales.ru/search/MOW0510AER1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "MRV", "mode": "air", "carrier": "U6",
       "flight_number": "U6247", "depart": "2026-10-07T13:00", "duration_min": 150,
-      "price": 5200, "currency": "RUB", "price_kind": "cached", "source": "aviasales"
+      "price": 5200, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
+      "deep_link": "https://www.aviasales.ru/search/MOW0710MRV1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "EVN", "mode": "air", "carrier": "3F",
       "flight_number": "3F202", "depart": "2026-10-05T22:30", "duration_min": 200,
       "price": 9100, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
-      "notes": "FlyOne Armenia"
+      "notes": "FlyOne Armenia",
+      "deep_link": "https://www.aviasales.ru/search/MOW0510EVN1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "IST", "mode": "air", "carrier": "TK",
       "flight_number": "TK414", "depart": "2026-10-05T15:00", "duration_min": 200,
-      "price": 13500, "currency": "RUB", "price_kind": "cached", "source": "aviasales"
+      "price": 13500, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
+      "deep_link": "https://www.aviasales.ru/search/MOW0510IST1", "link_kind": "search"
     },
     {
       "origin": "IST", "destination": "TBS", "mode": "air", "carrier": "TK",
       "flight_number": "TK378", "depart": "2026-10-06T02:30", "duration_min": 165,
       "price": 118.0, "currency": "EUR", "price_kind": "live", "source": "duffel",
       "payment_channel": "foreign_card", "baggage_included": true,
-      "notes": "живой оффер, оплата иностранной картой"
+      "notes": "живой оффер, оплата иностранной картой",
+      "booking_ref": "оффер Duffel off_demo_0001 — бронируется через API, офферы живут ~20 минут"
     },
     {
       "origin": "MOW", "destination": "KUT", "mode": "air", "carrier": "W6",
       "flight_number": "W64512", "depart": "2026-10-06T11:40", "duration_min": 215,
       "price": 8300, "currency": "RUB", "price_kind": "cached", "source": "aviasales",
-      "notes": "лоукостер, багаж отдельно"
+      "notes": "лоукостер, багаж отдельно",
+      "deep_link": "https://www.aviasales.ru/search/MOW0610KUT1", "link_kind": "search"
     },
     {
       "origin": "MOW", "destination": "TBS", "mode": "tour", "carrier": "Anex",
       "depart": "2026-10-06T09:00", "duration_min": 210,
       "price": 11900, "nights": 4, "currency": "RUB", "price_kind": "cached",
       "source": "tourvisor", "baggage_included": true,
-      "notes": "горящий пакет 11900₽ за 4 ночи: перелёт туда-обратно + отель дешевле билета в одну сторону"
+      "notes": "горящий пакет 11900₽ за 4 ночи: перелёт туда-обратно + отель дешевле билета в одну сторону",
+      "deep_link": "https://tourvisor.ru/hotel/demo-batumi-4", "link_kind": "info",
+      "booking_ref": "тур №8812041 (Anex) — бронируется у агента, ссылка ведёт на отель"
     },
     {
       "origin": "MOW", "destination": "TBS", "mode": "tour", "carrier": "Coral",
       "depart": "2026-10-08T10:30", "duration_min": 210,
       "price": 34900, "nights": 7, "currency": "RUB", "price_kind": "cached",
       "source": "tourvisor", "baggage_included": true,
-      "notes": "обычный пакет: дороже сухого билета, в топ попадать не должен"
+      "notes": "обычный пакет: дороже сухого билета, в топ попадать не должен",
+      "deep_link": "https://tourvisor.ru/hotel/demo-tbilisi-5", "link_kind": "info",
+      "booking_ref": "тур №8815577 (Coral) — бронируется у агента, ссылка ведёт на отель"
     }
   ]
 }

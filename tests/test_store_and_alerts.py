@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from conftest import TZ_MOW, make_leg
 from tbs_tracker.alerts import evaluate
-from tbs_tracker.models import Itinerary, Mode
+from tbs_tracker.models import Itinerary, LinkKind, Mode
 from tbs_tracker.routing.search import compute_cost
 from tbs_tracker.store import Store
 
@@ -67,6 +67,22 @@ def test_alert_fires_on_percentile_drop(base_config, tmp_path):
         kinds = {a.kind for a in alerts}
         assert "percentile" in kinds
         assert "drop" in kinds
+
+
+def test_alert_carries_purchase_links_for_every_leg(base_config, tmp_path):
+    """Алерт без ссылок бесполезен: пока ищешь, где купить, цена уходит."""
+    base_config.alerts.target_price_rub = 20000
+    with Store(tmp_path / "links.sqlite3") as store:
+        run_id = store.start_run(["fixtures"])
+        itinerary = _itinerary(7000, base_config)
+        itinerary.legs[0].deep_link = "https://azimuth.aero/"
+        itinerary.legs[0].link_kind = LinkKind.BOOKING
+        itinerary.legs[1].booking_ref = "билет у водителя"
+
+        message = evaluate([itinerary], store, base_config, run_id=run_id)[0].message
+
+        assert "купить: https://azimuth.aero/" in message
+        assert "купить: билет у водителя" in message
 
 
 def test_alert_marks_non_live_prices(base_config, tmp_path):

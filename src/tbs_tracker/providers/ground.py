@@ -15,7 +15,7 @@ import logging
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
-from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
+from ..models import Leg, LegQuery, LinkKind, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import localize
 from .base import Provider, now_utc, register
 
@@ -109,6 +109,12 @@ class GroundProvider(Provider):
         note = spec.get("note")
         observed = now_utc()
         flexible = bool(spec.get("flexible", not schedule))
+        payment = PaymentChannel(str(spec.get("payment_channel", "cash")))
+        # Маршрутки на Ларс обычно не продают билеты онлайн: если в конфиге нет
+        # ни сайта, ни канала брони, честнее сказать «на месте», чем молчать.
+        booking_ref = spec.get("booking_ref")
+        if not booking_ref and not spec.get("url") and payment == PaymentChannel.CASH:
+            booking_ref = "билет у водителя или в кассе на месте"
         legs: list[Leg] = []
 
         for day in query.dates():
@@ -125,10 +131,12 @@ class GroundProvider(Provider):
                         duration_min=total_duration,
                         carrier=spec.get("carrier"),
                         price_kind=PriceKind.ESTIMATE,
-                        payment_channel=PaymentChannel(str(spec.get("payment_channel", "cash"))),
+                        payment_channel=payment,
                         baggage_included=True,
                         flexible=True,
                         deep_link=spec.get("url"),
+                        link_kind=LinkKind.BOOKING,
+                        booking_ref=booking_ref,
                         observed_at=observed,
                         notes=note,
                         raw={"price_range": [spec.get("price_min_rub"), spec.get("price_max_rub")]},
@@ -147,10 +155,12 @@ class GroundProvider(Provider):
                         duration_min=total_duration,
                         carrier=spec.get("carrier"),
                         price_kind=PriceKind.ESTIMATE,
-                        payment_channel=PaymentChannel(str(spec.get("payment_channel", "cash"))),
+                        payment_channel=payment,
                         baggage_included=True,
                         flexible=False,
                         deep_link=spec.get("url"),
+                        link_kind=LinkKind.BOOKING,
+                        booking_ref=booking_ref,
                         observed_at=observed,
                         notes=note,
                         raw={"price_range": [spec.get("price_min_rub"), spec.get("price_max_rub")]},

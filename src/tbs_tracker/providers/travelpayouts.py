@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
+from ..models import Leg, LegQuery, LinkKind, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import parse_dt
 from .base import Provider, now_utc, register
 
@@ -118,6 +118,9 @@ class TravelpayoutsProvider(Provider):
                     payment_channel=PaymentChannel.RU_CARD,
                     baggage_included=False,
                     deep_link=f"{AVIASALES_SEARCH_URL}{link}" if link else None,
+                    # Ссылка открывает поиск с нужными параметрами, а не готовую
+                    # бронь: цена кэшированная и на выдаче может отличаться.
+                    link_kind=LinkKind.SEARCH,
                     observed_at=observed,
                     notes="кэш поисков Aviasales, требует подтверждения",
                     raw=item,

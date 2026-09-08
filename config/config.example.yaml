@@ -139,6 +139,9 @@ providers:
   ground:
     enabled: true
     yandex_apikey_env: YANDEX_RASP_APIKEY
+    # url — страница, где плечо реально покупают; booking_ref — текстовая подсказка,
+    # когда онлайн-продажи нет (телефон диспетчера, «касса на вокзале»). Если нет
+    # ни того, ни другого и оплата наличными, трекер сам подскажет «на месте».
     legs:
       - origin: OGZ
         destination: TBS
@@ -164,6 +167,7 @@ providers:
         flexible: true
         payment_channel: cash
         note: "такси 3000-6000 ₽ за машину до 4 чел., цена указана на человека"
+        booking_ref: "договариваться на месте у автовокзала или через диспетчера"
       - origin: MRV
         destination: TBS
         mode: bus

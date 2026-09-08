@@ -75,6 +75,7 @@ def render_details(itinerary: Itinerary) -> str:
         lines.append(f"  • {leg.describe()} [{leg.source}, {leg.price_kind.value}]")
         if leg.notes:
             lines.append(f"      {leg.notes}")
+        lines.append(f"      {leg.where_to_buy()}")
     gaps = itinerary.layovers_min()
     if gaps:
         lines.append("  стыковки: " + ", ".join(fmt_duration(g) for g in gaps))
@@ -234,6 +235,8 @@ def render_json(itineraries: Sequence[Itinerary]) -> str:
                     "price_kind": leg.price_kind.value,
                     "source": leg.source,
                     "deep_link": leg.deep_link,
+                    "link_kind": leg.link_kind.value,
+                    "booking_ref": leg.booking_ref,
                     "nights_included": leg.nights_included,
                     "return_flight_included": leg.return_flight_included,
                     "notes": leg.notes,

@@ -122,6 +122,10 @@ def test_cli_run_and_routes_offline(demo_config, capsys, monkeypatch):
     assert "Источники:" in out
     assert "MOW → OGZ → TBS" in out
 
+    # Без ссылки вариант бесполезен: по нему нечего покупать.
+    assert "искать: https://www.aviasales.ru/search/" in out
+    assert "купить: билет у водителя или в кассе на месте" in out
+
     assert main(["-c", "config/demo.yaml", "history", "--best"]) == 0
     assert "MOW>OGZ>TBS" in capsys.readouterr().out
 
