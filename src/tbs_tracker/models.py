@@ -80,10 +80,11 @@ class Leg:
     observed_at: datetime | None = None
     # Плечо без жёсткого расписания (маршрутки «по заполнению», такси).
     flexible: bool = False
-    # Что ещё входит в цену, кроме самой перевозки (актуально для пакетных туров).
+    # Что ещё входит в цену, кроме нужной нам перевозки (пакетные туры).
     nights_included: int = 0
-    accommodation_credit_rub: float = 0.0
     return_flight_included: bool = False
+    #: Денежная оценка включённого — учитывается отдельно от цены, см. tours.py.
+    bundle_credit_rub: float = 0.0
     notes: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -137,9 +138,10 @@ class CostBreakdown:
     """Из чего складывается стоимость варианта.
 
     Разделение принципиальное: `out_of_pocket_rub` — это деньги, которые реально
-    уходят из кошелька, и именно по ним сравниваются варианты. Включённое в тур
-    проживание — не скидка на билет, а отдельная польза: она попадает в
-    `accommodation_credit_rub` и влияет только на «полезную» стоимость.
+    уходят из кошелька, и именно по ним сравниваются варианты. Всё, что входит в
+    пакетный тур сверх нужного нам перелёта (отель, обратное плечо), — не скидка
+    на билет, а отдельная польза: она попадает в `bundle_credit_rub` и влияет
+    только на «полезную» стоимость.
     """
 
     tickets_rub: float = 0.0
@@ -147,7 +149,7 @@ class CostBreakdown:
     baggage_rub: float = 0.0
     overnight_rub: float = 0.0
     risk_rub: float = 0.0
-    accommodation_credit_rub: float = 0.0
+    bundle_credit_rub: float = 0.0
     time_cost_rub: float = 0.0
 
     @property
@@ -162,12 +164,12 @@ class CostBreakdown:
 
     @property
     def applied_credit_rub(self) -> float:
-        """Зачёт проживания не может превышать саму цену варианта."""
-        return min(self.accommodation_credit_rub, self.out_of_pocket_rub)
+        """Зачёт включённого не может превышать саму цену варианта."""
+        return min(self.bundle_credit_rub, self.out_of_pocket_rub)
 
     @property
     def value_rub(self) -> float:
-        """Цена за вычетом того, что уже включено в пакет (отель)."""
+        """Цена за вычетом того, что уже включено в пакет (отель, обратное плечо)."""
         return self.out_of_pocket_rub - self.applied_credit_rub
 
     @property
@@ -182,7 +184,7 @@ class CostBreakdown:
             "baggage_rub": round(self.baggage_rub, 2),
             "overnight_rub": round(self.overnight_rub, 2),
             "risk_rub": round(self.risk_rub, 2),
-            "accommodation_credit_rub": round(self.applied_credit_rub, 2),
+            "bundle_credit_rub": round(self.applied_credit_rub, 2),
             "time_cost_rub": round(self.time_cost_rub, 2),
             "out_of_pocket_rub": round(self.out_of_pocket_rub, 2),
             "value_rub": round(self.value_rub, 2),

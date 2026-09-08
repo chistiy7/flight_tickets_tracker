@@ -210,7 +210,7 @@ def test_tourvisor_keeps_actual_package_price(base_config, monkeypatch):
     assert leg.nights_included == 7
     assert leg.return_flight_included is True
     # Без потребности в отеле зачёта нет: сравниваем ровно то, что платим.
-    assert leg.accommodation_credit_rub == 0
+    assert leg.bundle_credit_rub == 0
     assert "20000" in leg.notes
 
 
@@ -221,7 +221,7 @@ def test_tourvisor_credits_only_needed_nights(base_config, monkeypatch):
     leg = provider.safe_fetch(_tour_query()).legs[0]
     # Нужны 3 ночи из 7 включённых → зачёт 3 × 3000 ₽, цена пакета не меняется.
     assert leg.price_rub == pytest.approx(20000)
-    assert leg.accommodation_credit_rub == pytest.approx(9000)
+    assert leg.bundle_credit_rub == pytest.approx(9000)
 
 
 def test_tourvisor_does_not_drop_tours_cheaper_than_accommodation(base_config, monkeypatch):

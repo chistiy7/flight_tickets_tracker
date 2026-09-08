@@ -12,7 +12,7 @@ from typing import Any
 
 from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import parse_dt
-from ..tours import accommodation_credit_rub
+from ..tours import bundle_credit_rub
 from .base import Provider, now_utc, register
 
 
@@ -56,6 +56,9 @@ class FixturesProvider(Provider):
             currency = str(item.get("currency", "RUB")).upper()
             price = float(item["price"])
             nights = int(item.get("nights") or 0)
+            return_included = bool(
+                item.get("return_flight_included", mode == Mode.TOUR)
+            )
             legs.append(
                 Leg(
                     origin=query.origin,
@@ -76,11 +79,11 @@ class FixturesProvider(Provider):
                     baggage_included=bool(item.get("baggage_included", False)),
                     flexible=bool(item.get("flexible", False)),
                     nights_included=nights,
-                    accommodation_credit_rub=accommodation_credit_rub(
-                        nights, self.config.costs
-                    ),
-                    return_flight_included=bool(
-                        item.get("return_flight_included", mode == Mode.TOUR)
+                    return_flight_included=return_included,
+                    bundle_credit_rub=bundle_credit_rub(
+                        nights_included=nights,
+                        return_included=return_included,
+                        costs=self.config.costs,
                     ),
                     deep_link=item.get("deep_link"),
                     observed_at=observed,

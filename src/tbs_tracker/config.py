@@ -117,6 +117,9 @@ class CostsConfig:
     #: Сколько ночей проживания вам всё равно нужно оплачивать. 0 — сравнивать
     #: туры с билетами строго по фактической цене, без зачёта отеля.
     trip_nights: int = 0
+    #: Во сколько оценивать включённый в пакет обратный перелёт. 0 — не зачитывать:
+    #: считаем, что за цену тура получаем только нужный билет в одну сторону.
+    return_flight_value_rub: float = 0.0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CostsConfig":
@@ -127,6 +130,8 @@ class CostsConfig:
             raise ConfigError("costs.self_transfer_failure_prob должен быть в [0, 1]")
         if cfg.trip_nights < 0:
             raise ConfigError("costs.trip_nights не может быть отрицательным")
+        if cfg.return_flight_value_rub < 0:
+            raise ConfigError("costs.return_flight_value_rub не может быть отрицательным")
         return cfg
 
 

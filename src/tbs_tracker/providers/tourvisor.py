@@ -18,7 +18,7 @@ from typing import Any
 
 from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult, TourOffer
 from ..timeutil import parse_dt
-from ..tours import accommodation_credit_rub, describe_package
+from ..tours import bundle_credit_rub, describe_package
 from .base import Provider, now_utc, register
 
 API_ROOT = "https://api.tourvisor.ru/search"
@@ -60,7 +60,11 @@ class TourvisorProvider(Provider):
             # Цена плеча — это цена пакета целиком: столько денег реально уходит.
             # Проживание не вычитается, иначе сравнение перестаёт быть сравнением
             # того, что вы платите.
-            credit = accommodation_credit_rub(tour.nights, self.config.costs)
+            credit = bundle_credit_rub(
+                nights_included=tour.nights,
+                return_included=True,
+                costs=self.config.costs,
+            )
             legs.append(
                 Leg(
                     origin=tour.origin,
@@ -77,8 +81,8 @@ class TourvisorProvider(Provider):
                     payment_channel=PaymentChannel.RU_CARD,
                     baggage_included=True,
                     nights_included=tour.nights,
-                    accommodation_credit_rub=credit,
                     return_flight_included=True,
+                    bundle_credit_rub=credit,
                     deep_link=tour.deep_link,
                     observed_at=observed,
                     notes=describe_package(

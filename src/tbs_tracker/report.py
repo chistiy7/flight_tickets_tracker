@@ -86,17 +86,33 @@ def render_details(itinerary: Itinerary) -> str:
         "+ багаж {baggage_rub:.0f}₽ + ночёвки {overnight_rub:.0f}₽ "
         "= {out_of_pocket_rub:.0f}₽ к оплате".format(**cost)
     )
-    if itinerary.cost.applied_credit_rub:
-        nights = sum(leg.nights_included for leg in itinerary.legs)
+    included = _describe_included(itinerary)
+    if included and itinerary.cost.applied_credit_rub:
         lines.append(
-            f"  включено проживание ({nights} н.): зачёт "
-            f"{itinerary.cost.applied_credit_rub:.0f}₽ → "
-            f"{itinerary.cost.value_rub:.0f}₽ с учётом того, что отель уже оплачен"
+            f"  в цену входит: {included} — зачтено "
+            f"{itinerary.cost.applied_credit_rub:.0f}₽, полезная стоимость "
+            f"{itinerary.cost.value_rub:.0f}₽"
+        )
+    elif included:
+        lines.append(
+            f"  в цену входит: {included} — не зачтено, сравнение как за билет "
+            "в одну сторону"
         )
     lines.append(f"  для ранжирования (риск + время): {cost['generalized_rub']:.0f}₽")
     if itinerary.flags:
         lines.append(f"  флаги: {', '.join(itinerary.flags)}")
     return "\n".join(lines)
+
+
+def _describe_included(itinerary: Itinerary) -> str:
+    """Что входит в цену сверх нужного нам перелёта в одну сторону."""
+    nights = sum(leg.nights_included for leg in itinerary.legs)
+    parts = []
+    if any(leg.return_flight_included for leg in itinerary.legs):
+        parts.append("обратный перелёт")
+    if nights:
+        parts.append(f"проживание {nights} н.")
+    return ", ".join(parts)
 
 
 def render_run_report(
@@ -233,8 +249,8 @@ def render_json(itineraries: Sequence[Itinerary]) -> str:
                     "source": leg.source,
                     "deep_link": leg.deep_link,
                     "nights_included": leg.nights_included,
-                    "accommodation_credit_rub": leg.accommodation_credit_rub,
                     "return_flight_included": leg.return_flight_included,
+                    "bundle_credit_rub": leg.bundle_credit_rub,
                     "notes": leg.notes,
                 }
                 for leg in itinerary.legs

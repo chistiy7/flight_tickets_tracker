@@ -15,7 +15,7 @@ from conftest import TZ_MOW, make_leg
 from tbs_tracker.models import Itinerary, Mode
 from tbs_tracker.routing.rules import classify, flags_for
 from tbs_tracker.routing.search import compute_cost
-from tbs_tracker.tours import accommodation_credit_rub
+from tbs_tracker.tours import accommodation_credit_rub, bundle_credit_rub
 
 
 def _tour_leg(price: float, *, nights: int, config) -> object:
@@ -25,7 +25,9 @@ def _tour_leg(price: float, *, nights: int, config) -> object:
     )
     leg.nights_included = nights
     leg.return_flight_included = True
-    leg.accommodation_credit_rub = accommodation_credit_rub(nights, config.costs)
+    leg.bundle_credit_rub = bundle_credit_rub(
+        nights_included=nights, return_included=True, costs=config.costs
+    )
     return leg
 
 
@@ -53,6 +55,46 @@ def test_cheaper_tour_beats_pricier_ticket(base_config):
     assert tour.cost.generalized_rub < ticket.cost.generalized_rub
     assert tour.chain_class == "E"
     assert {"package_tour", "hotel_included", "return_included"} <= set(tour.flags)
+
+
+def test_by_default_included_extras_are_ignored(base_config):
+    """По умолчанию за цену пакета считаем, что получаем только билет в одну сторону."""
+    base_config.costs.trip_nights = 0
+    base_config.costs.return_flight_value_rub = 0
+
+    tour = _itinerary([_tour_leg(20000, nights=7, config=base_config)], base_config)
+
+    assert tour.cost.bundle_credit_rub == 0
+    assert tour.cost.value_rub == tour.cost.out_of_pocket_rub == 20000
+    # При этом видно, что в цену входит больше: выгода не потеряна, а не оцифрована.
+    assert {"hotel_included", "return_included"} <= set(tour.flags)
+    assert tour.legs[0].nights_included == 7
+
+
+def test_return_flight_credit_is_opt_in(base_config):
+    base_config.costs.trip_nights = 0
+    base_config.costs.return_flight_value_rub = 13000
+
+    tour = _itinerary([_tour_leg(20000, nights=7, config=base_config)], base_config)
+
+    assert tour.cost.out_of_pocket_rub == 20000
+    assert tour.cost.applied_credit_rub == 13000
+    assert tour.cost.value_rub == 7000
+
+
+def test_bundle_credit_sums_hotel_and_return(base_config):
+    base_config.costs.trip_nights = 2
+    base_config.costs.tour_accommodation_rub_per_night = 3000
+    base_config.costs.return_flight_value_rub = 13000
+
+    credit = bundle_credit_rub(nights_included=7, return_included=True, costs=base_config.costs)
+    assert credit == pytest.approx(2 * 3000 + 13000)
+
+    # Плечо без обратного перелёта получает только «отельную» часть.
+    credit_one_way = bundle_credit_rub(
+        nights_included=7, return_included=False, costs=base_config.costs
+    )
+    assert credit_one_way == pytest.approx(6000)
 
 
 def test_accommodation_is_a_bonus_not_a_discount(base_config):
