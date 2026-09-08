@@ -80,6 +80,10 @@ class Leg:
     observed_at: datetime | None = None
     # Плечо без жёсткого расписания (маршрутки «по заполнению», такси).
     flexible: bool = False
+    # Что ещё входит в цену, кроме самой перевозки (актуально для пакетных туров).
+    nights_included: int = 0
+    accommodation_credit_rub: float = 0.0
+    return_flight_included: bool = False
     notes: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -130,7 +134,13 @@ class Leg:
 
 @dataclass
 class CostBreakdown:
-    """Из чего складывается полная стоимость варианта."""
+    """Из чего складывается стоимость варианта.
+
+    Разделение принципиальное: `out_of_pocket_rub` — это деньги, которые реально
+    уходят из кошелька, и именно по ним сравниваются варианты. Включённое в тур
+    проживание — не скидка на билет, а отдельная польза: она попадает в
+    `accommodation_credit_rub` и влияет только на «полезную» стоимость.
+    """
 
     tickets_rub: float = 0.0
     transfers_rub: float = 0.0
@@ -142,19 +152,28 @@ class CostBreakdown:
 
     @property
     def out_of_pocket_rub(self) -> float:
-        """Реальные деньги: билеты + трансферы + багаж + ночёвки минус зачёт отеля в туре."""
+        """Реальные деньги: билеты/пакет + трансферы + багаж + ночёвки в пути."""
         return (
             self.tickets_rub
             + self.transfers_rub
             + self.baggage_rub
             + self.overnight_rub
-            - self.accommodation_credit_rub
         )
+
+    @property
+    def applied_credit_rub(self) -> float:
+        """Зачёт проживания не может превышать саму цену варианта."""
+        return min(self.accommodation_credit_rub, self.out_of_pocket_rub)
+
+    @property
+    def value_rub(self) -> float:
+        """Цена за вычетом того, что уже включено в пакет (отель)."""
+        return self.out_of_pocket_rub - self.applied_credit_rub
 
     @property
     def generalized_rub(self) -> float:
         """Стоимость с учётом риска и цены времени — по ней ранжируем."""
-        return self.out_of_pocket_rub + self.risk_rub + self.time_cost_rub
+        return self.value_rub + self.risk_rub + self.time_cost_rub
 
     def as_dict(self) -> dict[str, float]:
         return {
@@ -163,9 +182,10 @@ class CostBreakdown:
             "baggage_rub": round(self.baggage_rub, 2),
             "overnight_rub": round(self.overnight_rub, 2),
             "risk_rub": round(self.risk_rub, 2),
-            "accommodation_credit_rub": round(self.accommodation_credit_rub, 2),
+            "accommodation_credit_rub": round(self.applied_credit_rub, 2),
             "time_cost_rub": round(self.time_cost_rub, 2),
             "out_of_pocket_rub": round(self.out_of_pocket_rub, 2),
+            "value_rub": round(self.value_rub, 2),
             "generalized_rub": round(self.generalized_rub, 2),
         }
 
@@ -276,6 +296,9 @@ class TourOffer:
     deep_link: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
-    def flight_equivalent_rub(self, accommodation_rub_per_night: float) -> float:
-        """Цена тура минус оценка проживания — сравнимо с сухим билетом."""
-        return self.price_rub - accommodation_rub_per_night * self.nights
+    @property
+    def discount_pct(self) -> float | None:
+        """Насколько пакет уценён относительно исходной цены — признак «горящего»."""
+        if not self.price_old_rub or self.price_old_rub <= 0:
+            return None
+        return (self.price_old_rub - self.price_rub) / self.price_old_rub * 100

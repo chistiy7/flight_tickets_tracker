@@ -29,6 +29,9 @@ costs:
   time_value_rub_per_hour: 150
   self_transfer_failure_prob: 0.06
   rebooking_cost_rub: 12000
+  # Туры конкурируют с билетами по фактической цене; отель зачитывается только
+  # за те ночи, которые всё равно нужны (здесь — 3 из включённых).
+  trip_nights: 3
   tour_accommodation_rub_per_night: 3000
 
 filters:

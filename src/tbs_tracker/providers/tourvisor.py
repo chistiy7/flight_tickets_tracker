@@ -1,9 +1,9 @@
 """Tourvisor — поиск туров и «горячие туры».
 
 Российская специфика: чартерный/блочный пакет в Грузию иногда дешевле сухого билета,
-потому что туроператор сливает непроданные места. Чтобы сравнение было честным, из
-цены пакета вычитается оценка стоимости проживания
-(`costs.tour_accommodation_rub_per_night`) — получается «эквивалент авиабилета».
+потому что туроператор сливает непроданные места. Пакет попадает в выдачу со своей
+фактической ценой и конкурирует с билетами напрямую: тур за 20 000 ₽ выгоднее билета
+за 25 000 ₽, даже если отель вам не нужен. Логика зачёта проживания — в `tours.py`.
 
 Доступ: JWT из ЛК турагента в заголовке `Authorization: Bearer ...`, разделы
 оплачиваются отдельно, лимит 3000 поисков/сутки.
@@ -18,6 +18,7 @@ from typing import Any
 
 from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult, TourOffer
 from ..timeutil import parse_dt
+from ..tours import accommodation_credit_rub, describe_package
 from .base import Provider, now_utc, register
 
 API_ROOT = "https://api.tourvisor.ru/search"
@@ -51,19 +52,21 @@ class TourvisorProvider(Provider):
 
     def fetch(self, query: LegQuery) -> ProviderResult:
         tours = self.fetch_tours(query)
-        per_night = self.config.costs.tour_accommodation_rub_per_night
         observed = now_utc()
         legs: list[Leg] = []
         for tour in tours:
-            equivalent = tour.flight_equivalent_rub(per_night)
-            if equivalent <= 0:
+            if tour.price_rub <= 0:
                 continue
+            # Цена плеча — это цена пакета целиком: столько денег реально уходит.
+            # Проживание не вычитается, иначе сравнение перестаёт быть сравнением
+            # того, что вы платите.
+            credit = accommodation_credit_rub(tour.nights, self.config.costs)
             legs.append(
                 Leg(
                     origin=tour.origin,
                     destination=tour.destination,
                     mode=Mode.TOUR,
-                    price_rub=equivalent,
+                    price_rub=tour.price_rub,
                     price_original=tour.price_rub,
                     currency="RUB",
                     source=self.name,
@@ -73,13 +76,17 @@ class TourvisorProvider(Provider):
                     price_kind=PriceKind.CACHED,
                     payment_channel=PaymentChannel.RU_CARD,
                     baggage_included=True,
+                    nights_included=tour.nights,
+                    accommodation_credit_rub=credit,
+                    return_flight_included=True,
                     deep_link=tour.deep_link,
                     observed_at=observed,
-                    notes=(
-                        f"пакет {tour.price_rub:.0f}₽ / {tour.nights} н. "
-                        f"({tour.hotel or 'отель без названия'}); "
-                        f"эквивалент билета {equivalent:.0f}₽ при "
-                        f"{per_night:.0f}₽/ночь"
+                    notes=describe_package(
+                        price_rub=tour.price_rub,
+                        nights=tour.nights,
+                        credit_rub=credit,
+                        hotel=tour.hotel,
+                        price_old_rub=tour.price_old_rub,
                     ),
                     raw=tour.raw,
                 )

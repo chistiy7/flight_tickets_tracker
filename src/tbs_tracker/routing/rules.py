@@ -100,6 +100,10 @@ def flags_for(legs: list[Leg], layovers_min: list[int], cfg: ConnectionsConfig) 
         flags.append("requires_foreign_card")
     if any(leg.mode == Mode.TOUR for leg in legs):
         flags.append("package_tour")
+    if any(leg.nights_included for leg in legs):
+        flags.append("hotel_included")
+    if any(leg.return_flight_included for leg in legs):
+        flags.append("return_included")
     if not all(leg.baggage_included for leg in legs):
         flags.append("baggage_extra")
     countries = {place(leg.destination).country for leg in legs[:-1]}

@@ -21,17 +21,19 @@ CLASS_TITLES = {
 }
 
 
-def unique_by_route(itineraries: Sequence[Itinerary]) -> list[Itinerary]:
-    """Лучший вариант на каждый маршрут.
+def best_variants(itineraries: Sequence[Itinerary]) -> list[Itinerary]:
+    """Лучший вариант на каждую пару «маршрут + класс цепочки».
 
-    Без этого обзорная таблица забивается одним и тем же маршрутом на разные даты
-    и не показывает альтернативы.
+    Без этого обзорная таблица забивается одним и тем же маршрутом на разные даты.
+    Класс входит в ключ, потому что Москва → Тбилиси пакетным туром и Москва → Тбилиси
+    сухим билетом — это разные предложения, и сравнивать их нужно рядом.
     """
-    best: dict[str, Itinerary] = {}
+    best: dict[tuple[str, str], Itinerary] = {}
     for itinerary in itineraries:
-        current = best.get(itinerary.route_key)
+        key = (itinerary.route_key, itinerary.chain_class)
+        current = best.get(key)
         if current is None or itinerary.cost.generalized_rub < current.cost.generalized_rub:
-            best[itinerary.route_key] = itinerary
+            best[key] = itinerary
     return sorted(best.values(), key=lambda it: it.cost.generalized_rub)
 
 
@@ -41,10 +43,10 @@ def render_table(
     if not itineraries:
         return "Ничего не найдено."
     if one_per_route:
-        itineraries = unique_by_route(itineraries)
+        itineraries = best_variants(itineraries)
     header = (
-        f"{'Маршрут':<26}{'Вылет':<13}{'В пути':<10}{'Билеты':>10}"
-        f"{'Итого':>10}{'Кл':>4}  Источники / флаги"
+        f"{'Маршрут':<26}{'Вылет':<13}{'В пути':<10}{'Цена':>10}"
+        f"{'Заплатить':>11}{'С зачётом':>11}{'Кл':>4}  Источники / флаги"
     )
     lines = [header, "-" * len(header)]
     for itinerary in itineraries[:limit]:
@@ -52,11 +54,13 @@ def render_table(
         extras = ", ".join(itinerary.sources)
         if itinerary.flags:
             extras = f"{extras} | {', '.join(itinerary.flags)}"
+        cost = itinerary.cost
+        credited = f"{cost.value_rub:>11.0f}" if cost.applied_credit_rub else f"{'—':>11}"
         lines.append(
             f"{route:<26}{fmt_dt(itinerary.depart):<13}"
             f"{fmt_duration(itinerary.total_duration_min):<10}"
             f"{itinerary.tickets_rub:>10.0f}"
-            f"{itinerary.cost.out_of_pocket_rub:>10.0f}"
+            f"{cost.out_of_pocket_rub:>11.0f}{credited}"
             f"{itinerary.chain_class:>4}  {extras}"
         )
     return "\n".join(lines)
@@ -78,10 +82,18 @@ def render_details(itinerary: Itinerary) -> str:
         lines.append("  стыковки: " + ", ".join(fmt_duration(g) for g in gaps))
     cost = itinerary.cost.as_dict()
     lines.append(
-        "  стоимость: билеты {tickets_rub:.0f}₽ + трансферы {transfers_rub:.0f}₽ "
+        "  стоимость: плечи {tickets_rub:.0f}₽ + трансферы {transfers_rub:.0f}₽ "
         "+ багаж {baggage_rub:.0f}₽ + ночёвки {overnight_rub:.0f}₽ "
-        "= {out_of_pocket_rub:.0f}₽; с риском и временем {generalized_rub:.0f}₽".format(**cost)
+        "= {out_of_pocket_rub:.0f}₽ к оплате".format(**cost)
     )
+    if itinerary.cost.applied_credit_rub:
+        nights = sum(leg.nights_included for leg in itinerary.legs)
+        lines.append(
+            f"  включено проживание ({nights} н.): зачёт "
+            f"{itinerary.cost.applied_credit_rub:.0f}₽ → "
+            f"{itinerary.cost.value_rub:.0f}₽ с учётом того, что отель уже оплачен"
+        )
+    lines.append(f"  для ранжирования (риск + время): {cost['generalized_rub']:.0f}₽")
     if itinerary.flags:
         lines.append(f"  флаги: {', '.join(itinerary.flags)}")
     return "\n".join(lines)
@@ -95,6 +107,13 @@ def render_run_report(
     limit: int = 15,
     details: int = 3,
 ) -> str:
+    if not itineraries:
+        return "\n".join([
+            render_table(itineraries, limit),
+            render_provider_summary(provider_results),
+            render_stats(stats),
+        ])
+
     blocks = [render_table(itineraries, limit)]
 
     best_by_class = cheapest_by_class(list(itineraries))
@@ -102,12 +121,25 @@ def render_run_report(
         lines = ["", "Лучшее по классам цепочек:"]
         for chain_class in sorted(best_by_class):
             itinerary = best_by_class[chain_class]
+            extra = ""
+            if itinerary.cost.applied_credit_rub:
+                extra = f" (с зачётом проживания {itinerary.cost.value_rub:.0f}₽)"
             lines.append(
                 f"  {chain_class} ({CLASS_TITLES.get(chain_class, '')}): "
-                f"{' → '.join(itinerary.path)} — {itinerary.cost.out_of_pocket_rub:.0f}₽, "
-                f"{fmt_duration(itinerary.total_duration_min)}"
+                f"{' → '.join(itinerary.path)} — {itinerary.cost.out_of_pocket_rub:.0f}₽"
+                f"{extra}, {fmt_duration(itinerary.total_duration_min)}"
             )
         blocks.append("\n".join(lines))
+
+    # Ранжирование учитывает риск, время и зачёт проживания, поэтому минимум по
+    # фактической оплате может быть другим вариантом — показываем его отдельно.
+    cheapest = min(itineraries, key=lambda it: it.cost.out_of_pocket_rub)
+    if cheapest is not itineraries[0]:
+        blocks.append(
+            f"\nМинимум по фактической оплате: {' → '.join(cheapest.path)} — "
+            f"{cheapest.cost.out_of_pocket_rub:.0f}₽, "
+            f"{fmt_duration(cheapest.total_duration_min)}, класс {cheapest.chain_class}"
+        )
 
     front = pareto_front(list(itineraries))
     if len(front) > 1:
@@ -122,7 +154,7 @@ def render_run_report(
 
     if details and itineraries:
         lines = ["", "Детали лучших вариантов:"]
-        for itinerary in unique_by_route(itineraries)[:details]:
+        for itinerary in best_variants(itineraries)[:details]:
             lines.append(render_details(itinerary))
             lines.append("")
         blocks.append("\n".join(lines))
@@ -200,6 +232,9 @@ def render_json(itineraries: Sequence[Itinerary]) -> str:
                     "price_kind": leg.price_kind.value,
                     "source": leg.source,
                     "deep_link": leg.deep_link,
+                    "nights_included": leg.nights_included,
+                    "accommodation_credit_rub": leg.accommodation_credit_rub,
+                    "return_flight_included": leg.return_flight_included,
                     "notes": leg.notes,
                 }
                 for leg in itinerary.legs

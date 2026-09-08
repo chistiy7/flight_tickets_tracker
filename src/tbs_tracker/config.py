@@ -114,6 +114,9 @@ class CostsConfig:
     self_transfer_failure_prob: float = 0.06
     rebooking_cost_rub: float = 12000.0
     tour_accommodation_rub_per_night: float = 3000.0
+    #: Сколько ночей проживания вам всё равно нужно оплачивать. 0 — сравнивать
+    #: туры с билетами строго по фактической цене, без зачёта отеля.
+    trip_nights: int = 0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CostsConfig":
@@ -122,6 +125,8 @@ class CostsConfig:
         cfg = cls(**data)
         if not 0.0 <= cfg.self_transfer_failure_prob <= 1.0:
             raise ConfigError("costs.self_transfer_failure_prob должен быть в [0, 1]")
+        if cfg.trip_nights < 0:
+            raise ConfigError("costs.trip_nights не может быть отрицательным")
         return cfg
 
 

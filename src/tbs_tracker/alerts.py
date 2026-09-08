@@ -117,6 +117,8 @@ def _render(itinerary: Itinerary, reason: str) -> str:
     ]
     for leg in itinerary.legs:
         lines.append(f"  • {leg.describe()} [{leg.source}]")
+        if leg.nights_included and leg.notes:
+            lines.append(f"      {leg.notes}")
     if itinerary.price_kind != PriceKind.LIVE:
         lines.append(
             "  ! цена не живая (кэш/оценка) — подтвердите на сайте перевозчика перед покупкой"

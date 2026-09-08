@@ -141,6 +141,10 @@ def compute_cost(legs: list[Leg], config: Config) -> CostBreakdown:
             if leg.mode == Mode.AIR and not leg.baggage_included:
                 breakdown.baggage_rub += costs.baggage_rub
 
+    # Проживание, уже включённое в пакет, не снижает его цену, а идёт отдельным
+    # зачётом — и только на те ночи, которые вам всё равно нужны.
+    breakdown.accommodation_credit_rub = sum(leg.accommodation_credit_rub for leg in legs)
+
     duration_min = _total_duration_min(legs)
     breakdown.time_cost_rub = (duration_min / 60.0) * costs.time_value_rub_per_hour
     return breakdown

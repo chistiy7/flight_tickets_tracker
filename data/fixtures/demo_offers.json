@@ -84,9 +84,16 @@
     {
       "origin": "MOW", "destination": "TBS", "mode": "tour", "carrier": "Anex",
       "depart": "2026-10-06T09:00", "duration_min": 210,
-      "price": 9500, "currency": "RUB", "price_kind": "cached", "source": "tourvisor",
-      "baggage_included": true,
-      "notes": "горячий тур 30500₽ / 7 ночей, эквивалент билета после вычета 3000₽/ночь"
+      "price": 11900, "nights": 4, "currency": "RUB", "price_kind": "cached",
+      "source": "tourvisor", "baggage_included": true,
+      "notes": "горящий пакет 11900₽ за 4 ночи: перелёт туда-обратно + отель дешевле билета в одну сторону"
+    },
+    {
+      "origin": "MOW", "destination": "TBS", "mode": "tour", "carrier": "Coral",
+      "depart": "2026-10-08T10:30", "duration_min": 210,
+      "price": 34900, "nights": 7, "currency": "RUB", "price_kind": "cached",
+      "source": "tourvisor", "baggage_included": true,
+      "notes": "обычный пакет: дороже сухого билета, в топ попадать не должен"
     }
   ]
 }

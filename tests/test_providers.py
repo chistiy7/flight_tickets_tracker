@@ -171,11 +171,18 @@ def test_serpapi_parses_best_and_other_flights(base_config, query, monkeypatch):
     assert all(leg.deep_link for leg in result.legs)
 
 
-def test_tourvisor_hot_tour_becomes_flight_equivalent(base_config, query, monkeypatch):
-    monkeypatch.setenv("TV", "jwt")
-    payload = [
+def _tourvisor(base_config, http):
+    options = {
+        "token_env": "TV", "country_id": 35, "departure_ids": {"MOW": 1},
+        "hot_only": True, "region_to_city": {"Тбилиси": "TBS"},
+    }
+    return _provider(TourvisorProvider, base_config, options, http)
+
+
+def _hot_tour_payload(price: float = 20000, nights: int = 7) -> list[dict]:
+    return [
         {
-            "price": 30500, "priceOld": 41000, "nights": 7, "currency": "RUB",
+            "price": price, "priceOld": 41000, "nights": nights, "currency": "RUB",
             "date": "2026-10-06", "tourId": "t1",
             "hotel": {"name": "Tbilisi Inn", "category": 3,
                       "region": {"name": "Тбилиси"}},
@@ -183,27 +190,54 @@ def test_tourvisor_hot_tour_becomes_flight_equivalent(base_config, query, monkey
             "meal": {"russianName": "завтраки"},
         }
     ]
-    options = {
-        "token_env": "TV", "country_id": 35, "departure_ids": {"MOW": 1},
-        "hot_only": True, "region_to_city": {"Тбилиси": "TBS"},
-    }
-    provider = _provider(TourvisorProvider, base_config, options, FakeHttp(payload))
-    tour_query = LegQuery("MOW", "TBS", date(2026, 10, 6), date(2026, 10, 6), modes=(Mode.TOUR,))
-    result = provider.safe_fetch(tour_query)
+
+
+def _tour_query() -> LegQuery:
+    return LegQuery("MOW", "TBS", date(2026, 10, 6), date(2026, 10, 6), modes=(Mode.TOUR,))
+
+
+def test_tourvisor_keeps_actual_package_price(base_config, monkeypatch):
+    """Цена плеча — это цена пакета, а не «эквивалент билета» после вычетов."""
+    monkeypatch.setenv("TV", "jwt")
+    base_config.costs.trip_nights = 0
+    provider = _tourvisor(base_config, FakeHttp(_hot_tour_payload(price=20000, nights=7)))
+    result = provider.safe_fetch(_tour_query())
+
     assert len(result.legs) == 1
     leg = result.legs[0]
-    # 30500 - 7 ночей × 3000 ₽ = 9500 ₽ «эквивалента билета».
-    assert leg.price_rub == pytest.approx(9500)
+    assert leg.price_rub == pytest.approx(20000)
     assert leg.mode == Mode.TOUR
-    assert "30500" in leg.notes
+    assert leg.nights_included == 7
+    assert leg.return_flight_included is True
+    # Без потребности в отеле зачёта нет: сравниваем ровно то, что платим.
+    assert leg.accommodation_credit_rub == 0
+    assert "20000" in leg.notes
+
+
+def test_tourvisor_credits_only_needed_nights(base_config, monkeypatch):
+    monkeypatch.setenv("TV", "jwt")
+    base_config.costs.trip_nights = 3
+    provider = _tourvisor(base_config, FakeHttp(_hot_tour_payload(price=20000, nights=7)))
+    leg = provider.safe_fetch(_tour_query()).legs[0]
+    # Нужны 3 ночи из 7 включённых → зачёт 3 × 3000 ₽, цена пакета не меняется.
+    assert leg.price_rub == pytest.approx(20000)
+    assert leg.accommodation_credit_rub == pytest.approx(9000)
+
+
+def test_tourvisor_does_not_drop_tours_cheaper_than_accommodation(base_config, monkeypatch):
+    """Пакет за 12 000 ₽ на 7 ночей — самый интересный случай, он не должен теряться."""
+    monkeypatch.setenv("TV", "jwt")
+    base_config.costs.trip_nights = 7
+    provider = _tourvisor(base_config, FakeHttp(_hot_tour_payload(price=12000, nights=7)))
+    legs = provider.safe_fetch(_tour_query()).legs
+    assert len(legs) == 1
+    assert legs[0].price_rub == pytest.approx(12000)
 
 
 def test_tourvisor_skips_without_dictionaries(base_config, monkeypatch):
     monkeypatch.setenv("TV", "jwt")
     provider = _provider(TourvisorProvider, base_config, {"token_env": "TV"}, FakeHttp([]))
-    result = provider.safe_fetch(
-        LegQuery("MOW", "TBS", date(2026, 10, 6), date(2026, 10, 6), modes=(Mode.TOUR,))
-    )
+    result = provider.safe_fetch(_tour_query())
     assert result.skipped_reason and "departure_ids" in result.skipped_reason
 
 
