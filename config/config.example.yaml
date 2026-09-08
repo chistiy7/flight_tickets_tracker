@@ -1,0 +1,255 @@
+# Конфигурация трекера Россия → Тбилиси.
+# Скопируйте в config/config.yaml и включите нужные источники.
+
+search:
+  # Опорные города вылета: прямые рейсы в Грузию либо дешёвый выход на наземный
+  # коридор / авиахаб. Обоснование по каждому — `tbs-tracker places`.
+  origins: [MOW, LED, AER, MRV, OGZ, SVX, KZN]
+  destinations: [TBS]
+  # Точки входа в Грузию: прибытие в KUT/BUS считается только вместе с наземным
+  # плечом до Тбилиси.
+  entry_points: [TBS, KUT, BUS]
+  hubs: [EVN, IST, SAW, GYD, MSQ]
+  max_legs: 3
+  # Отсекает бессмысленные крюки: длина пути / прямое расстояние.
+  detour_factor: 2.2
+  passengers: 1
+  top_n: 15
+  # Абсолютные окна дат...
+  windows:
+    - date_from: 2026-10-05
+      date_to: 2026-10-19
+  # ...или относительные, если трекер запускается по расписанию.
+  relative_windows:
+    - offset_days: 21
+      length_days: 14
+
+connections:
+  min_same_ticket_min: 75
+  # Два отдельных билета: получить багаж, повторный чек-ин, буфер на задержку.
+  min_self_transfer_min: 210
+  # Смена аэропорта (IST↔SAW, VKO↔ZIA) добавляет переезд по городу.
+  min_airport_change_min: 330
+  # Наземная граница Верхний Ларс: очереди 1-8 часов — это норма.
+  min_border_min: 240
+  min_ground_min: 90
+  max_layover_min: 1440
+  overnight_threshold_min: 480
+
+costs:
+  airport_transfer_rub: 600
+  border_transfer_rub: 0
+  overnight_rub: 3500
+  baggage_rub: 3000
+  need_baggage: true
+  time_value_rub_per_hour: 150
+  # Вероятность сорвать стыковку на двух отдельных билетах и цена перебронирования.
+  self_transfer_failure_prob: 0.06
+  rebooking_cost_rub: 12000
+  # Настроек для туров здесь нет и не нужно: пакет сравнивается с билетами по
+  # своей цене. Тур за 20 000 ₽ выгоднее билета за 25 000 ₽ — этого достаточно,
+  # а включённые отель и обратный перелёт цену пакета не меняют.
+
+filters:
+  sanity_min_price_rub: 1500
+  sanity_max_price_rub: 250000
+  allow_foreign_card_only: true
+  allow_cached_prices: true
+  max_total_duration_hours: 48
+  exclude_carriers: []
+
+providers:
+  # Кэш поисков Aviasales. Бесплатный токен, широкое покрытие рынка РФ.
+  travelpayouts:
+    enabled: true
+    token_env: TRAVELPAYOUTS_TOKEN
+    currency: rub
+    market: ru
+    limit: 100
+    day_by_day_threshold: 10
+
+  # Живые офферы для нероссийских плеч (Turkish, Pegasus, Wizz, flydubai).
+  duffel:
+    enabled: false
+    token_env: DUFFEL_TOKEN
+    api_version: v2
+    cabin_class: economy
+    max_connections: 1
+
+  # Google Flights как арбитр расхождений между источниками.
+  serpapi_google_flights:
+    enabled: false
+    token_env: SERPAPI_KEY
+    currency: RUB
+    language: ru
+    country: ru
+
+  # Горячие туры: пакет иногда дешевле сухого билета.
+  tourvisor:
+    enabled: false
+    token_env: TOURVISOR_JWT
+    # id из справочников Tourvisor (GET /departures, GET /countries).
+    country_id: 0
+    departure_ids:
+      MOW: 1
+      LED: 5
+    hot_only: true
+    nights_min: 3
+    nights_max: 10
+    limit: 50
+    region_to_city:
+      Тбилиси: TBS
+      Батуми: BUS
+      Кутаиси: KUT
+
+  # Прямые сайты авиакомпаний — источник истины по финальной цене.
+  # По умолчанию выключено: автоматический опрос сайтов обычно против ToS,
+  # эндпоинты и пути в ответе нужно заполнить самостоятельно.
+  airline_direct:
+    enabled: false
+    airlines:
+      - carrier: A4
+        name: Азимут
+        currency: RUB
+        routes: [[MOW, TBS], [MRV, TBS], [AER, TBS]]
+        booking_url: https://azimuth.aero/
+        request:
+          method: GET
+          url: "https://example.invalid/calendar?from={origin}&to={destination}&date={date}"
+        response:
+          items_path: data.days
+          price_path: minPrice
+          date_path: date
+          depart_path: departure
+          flight_number_path: flightNumber
+      - carrier: WZ
+        name: Red Wings
+        currency: RUB
+        routes: [[MOW, TBS], [AER, TBS], [SVX, TBS]]
+        booking_url: https://flyredwings.com/
+        request:
+          method: GET
+          url: "https://example.invalid/fares?from={origin}&to={destination}&date={date}"
+        response:
+          items_path: fares
+          price_path: total
+          date_path: departureDate
+
+  # Наземные плечи: маршрутки, автобусы, поезда. Цены — ориентиры (estimate).
+  ground:
+    enabled: true
+    yandex_apikey_env: YANDEX_RASP_APIKEY
+    legs:
+      - origin: OGZ
+        destination: TBS
+        mode: bus
+        carrier: Trans Kavkaz / Транскомалания
+        price_rub: 1500
+        price_min_rub: 700
+        price_max_rub: 2400
+        duration_min: 240
+        border_buffer_min: 120
+        flexible: true
+        payment_channel: cash
+        note: "маршрутка от автовокзала/пл. Штыба через КПП Верхний Ларс"
+        url: https://avtovokzal15.ru/vladikavkaz-tbilisi
+      - origin: OGZ
+        destination: TBS
+        mode: taxi
+        price_rub: 1250
+        price_min_rub: 750
+        price_max_rub: 1500
+        duration_min: 210
+        border_buffer_min: 120
+        flexible: true
+        payment_channel: cash
+        note: "такси 3000-6000 ₽ за машину до 4 чел., цена указана на человека"
+      - origin: MRV
+        destination: TBS
+        mode: bus
+        price_rub: 3850
+        duration_min: 540
+        border_buffer_min: 120
+        flexible: true
+        payment_channel: cash
+        note: "через Владикавказ и Верхний Ларс"
+      - origin: EVN
+        destination: TBS
+        mode: bus
+        price_rub: 1600
+        price_min_rub: 1500
+        price_max_rub: 3700
+        duration_min: 360
+        departures: ["08:00", "10:00", "14:00", "22:00", "23:30"]
+        payment_channel: cash
+        note: "автобусы и маршрутки Ереван-Тбилиси, 5-7 ч"
+      - origin: KUT
+        destination: TBS
+        mode: train
+        price_rub: 900
+        duration_min: 250
+        departures: ["07:30", "17:20"]
+        payment_channel: cash
+        note: "поезд/маршрутка внутри Грузии"
+      - origin: BUS
+        destination: TBS
+        mode: train
+        price_rub: 1200
+        duration_min: 320
+        departures: ["07:45", "16:30"]
+        payment_channel: cash
+        note: "поезд Батуми-Тбилиси, 20-30 лари"
+      - origin: GYD
+        destination: TBS
+        mode: bus
+        price_rub: 2000
+        duration_min: 540
+        border_buffer_min: 120
+        flexible: true
+        payment_channel: cash
+        note: "автобус Баку-Тбилиси; уточняйте режим работы границы"
+
+  # Офлайн-демо и тесты: цены из файла, без сети.
+  fixtures:
+    enabled: false
+    path: data/fixtures/demo_offers.json
+
+alerts:
+  target_price_rub: 9000
+  drop_pct: 15
+  percentile: 10
+  min_observations: 5
+  cooldown_hours: 12
+  channels:
+    console:
+      enabled: true
+    telegram:
+      enabled: false
+      bot_token_env: TELEGRAM_BOT_TOKEN
+      chat_id_env: TELEGRAM_CHAT_ID
+    webhook:
+      enabled: false
+      url_env: ALERT_WEBHOOK_URL
+
+runtime:
+  db_path: data/tracker.sqlite3
+  cache_dir: .cache
+  cache_ttl_minutes: 180
+  # Жёсткий потолок на прогон: у Tourvisor суточный лимит поисков, у остальных
+  # источников — квоты и рекомендации не дёргать API в реальном времени.
+  # Плечи опрашиваются в порядке приоритета, поэтому при исчерпании бюджета
+  # теряются только маловажные направления. Оценить объём: `tbs-tracker routes --queries`.
+  max_requests_per_run: 800
+  request_timeout_sec: 20
+  max_workers: 6
+  fx:
+    mode: cbr  # cbr — курсы ЦБ РФ раз в сутки; static — из static_rates
+    static_rates:
+      USD: 95.0
+      EUR: 105.0
+      GEL: 35.0
+      TRY: 2.6
+      AMD: 0.24
+      KZT: 0.19
+      AED: 26.0
+      BYN: 29.0
