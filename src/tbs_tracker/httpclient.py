@@ -106,9 +106,11 @@ class HttpClient:
         headers: dict[str, str] | None = None,
         source: str = "http",
         use_cache: bool = True,
+        charge_budget: bool = True,
     ) -> Any:
         return self._json_request("GET", url, params=params, headers=headers,
-                                  source=source, use_cache=use_cache)
+                                  source=source, use_cache=use_cache,
+                                  charge_budget=charge_budget)
 
     def post_json(
         self,
@@ -118,9 +120,11 @@ class HttpClient:
         headers: dict[str, str] | None = None,
         source: str = "http",
         use_cache: bool = True,
+        charge_budget: bool = True,
     ) -> Any:
         return self._json_request("POST", url, json_body=json_body, headers=headers,
-                                  source=source, use_cache=use_cache)
+                                  source=source, use_cache=use_cache,
+                                  charge_budget=charge_budget)
 
     def _json_request(
         self,
@@ -132,6 +136,7 @@ class HttpClient:
         headers: dict[str, str] | None = None,
         source: str = "http",
         use_cache: bool = True,
+        charge_budget: bool = True,
     ) -> Any:
         cache_key = json.dumps(
             [method, url, params or {}, json_body or {}], sort_keys=True, ensure_ascii=False
@@ -142,7 +147,9 @@ class HttpClient:
                 log.debug("cache hit %s %s", method, url)
                 return cached
 
-        if self.budget:
+        # Бюджет защищает чужие квоты. Обращение к своему складу офферов его не
+        # расходует, иначе опрос парсера конкурировал бы с внешними источниками.
+        if self.budget and charge_budget:
             self.budget.charge(source)
 
         last_error: Exception | None = None

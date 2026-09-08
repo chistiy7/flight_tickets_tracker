@@ -1,6 +1,7 @@
 """CLI трекера.
 
     tbs-tracker run      — полный прогон: опрос источников, сборка цепочек, алерты
+    tbs-tracker collect  — сбор цен на склад офферов, без сборки цепочек
     tbs-tracker routes   — топология маршрутов и план запросов, без обращения к сети
     tbs-tracker sources  — какие источники подключены и чего им не хватает
     tbs-tracker history  — история наблюдений и рекорды по маршрутам
@@ -13,10 +14,11 @@ import logging
 import sys
 from pathlib import Path
 
+from .collector import CollectorPolicy, CollectorStats, CollectorStore, collector_db_path
 from .config import Config, ConfigError
 from .geo import PLACES, detour_ratio, distance_km
-from .pipeline import build_runtime, provider_status, run_tracker
-from .report import render_json, render_run_report, render_source_catalog
+from .pipeline import build_runtime, collect_offers, provider_status, run_tracker
+from .report import render_json, render_provider_summary, render_run_report, render_source_catalog
 from .routing.graph import edge_modes, enumerate_paths, leg_queries
 from .store import Store
 from .timeutil import fmt_duration
@@ -44,6 +46,14 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument("--json", action="store_true", help="вывести результат в JSON")
     run_cmd.add_argument("--no-alerts", action="store_true", help="не отправлять уведомления")
     run_cmd.add_argument("--no-store", action="store_true", help="не писать историю в БД")
+
+    collect_cmd = sub.add_parser("collect", help="собрать цены на склад офферов")
+    collect_cmd.add_argument(
+        "--status", action="store_true", help="только показать состояние склада, не собирать"
+    )
+    collect_cmd.add_argument(
+        "--keep-stale", action="store_true", help="не вычищать записи старше max_age_minutes"
+    )
 
     routes_cmd = sub.add_parser("routes", help="показать топологию маршрутов без запросов")
     routes_cmd.add_argument("--limit", type=int, default=40)
@@ -79,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return _cmd_run(config, args)
+    if args.command == "collect":
+        return _cmd_collect(config, args)
     if args.command == "routes":
         return _cmd_routes(config, args)
     if args.command == "sources":
@@ -110,6 +122,38 @@ def _cmd_run(config: Config, args: argparse.Namespace) -> int:
     if not args.no_alerts and report.alerts and report.notifier:
         report.notifier.send(report.alerts)
     return 0 if report.itineraries else 1
+
+
+def _cmd_collect(config: Config, args: argparse.Namespace) -> int:
+    policy = CollectorPolicy.from_config(config)
+    db_path = collector_db_path(config)
+
+    if args.status:
+        if not db_path.exists():
+            print(f"Склад ещё не создан: {db_path}")
+            return 1
+        with CollectorStore(db_path) as store:
+            _print_store_state(db_path, store.stats(fresh_minutes=policy.fresh_minutes), policy)
+        return 0
+
+    report = collect_offers(config, prune=not args.keep_stale)
+    print(f"Запросов по плечам: {len(report.queries)}, израсходовано запросов: "
+          f"{report.requests_used}")
+    print(render_provider_summary(report.provider_results))
+    print(f"\nЗаписано офферов: {report.stored}"
+          + (f", вычищено устаревших: {report.pruned}" if report.pruned else ""))
+    if report.stats:
+        _print_store_state(report.db_path, report.stats, policy)
+    return 0 if report.stored else 1
+
+
+def _print_store_state(db_path: Path, stats: CollectorStats, policy: CollectorPolicy) -> None:
+    print(f"\nСклад: {db_path}")
+    print(f"  офферов всего: {stats.total}, свежих (до {policy.fresh_minutes} мин): {stats.fresh}")
+    if stats.newest_at:
+        print(f"  собрано: с {stats.oldest_at[:16]} по {stats.newest_at[:16]}")
+    for source, count in stats.by_source.items():
+        print(f"  {source}: {count}")
 
 
 def _cmd_routes(config: Config, args: argparse.Namespace) -> int:

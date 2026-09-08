@@ -6,8 +6,10 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 from .alerts import Alert, Notifier, evaluate
+from .collector import CollectorPolicy, CollectorStats, CollectorStore, collector_db_path
 from .config import Config
 from .fx import CurrencyConverter
 from .httpclient import HttpClient, RequestBudget
@@ -15,6 +17,7 @@ from .models import Itinerary, Leg, LegQuery, ProviderResult
 from .normalize import group_by_edge
 from .providers import build_providers
 from .providers.base import Provider
+from .providers.collector import CollectorProvider
 from .routing.graph import RoutePath, enumerate_paths, leg_queries
 from .routing.search import SearchStats, assemble_itineraries
 from .store import Store
@@ -79,6 +82,59 @@ def fetch_legs(
 
     legs = [leg for result in results for leg in result.legs]
     return results, legs
+
+
+@dataclass
+class CollectReport:
+    """Итог сеанса сбора: что положили на склад и в каком он состоянии."""
+
+    started_at: datetime
+    db_path: Path
+    queries: list[LegQuery]
+    provider_results: list[ProviderResult] = field(default_factory=list)
+    stored: int = 0
+    pruned: int = 0
+    requests_used: int = 0
+    stats: CollectorStats | None = None
+
+
+def collect_offers(config: Config, *, prune: bool = True) -> CollectReport:
+    """Сеанс сбора: опросить источники и сложить офферы на склад.
+
+    Цепочки здесь не собираются и алерты не считаются — это работа прогона.
+    Сбор нарочно отделён: он медленный, частично ломается и запускается по своему
+    расписанию, а прогон должен оставаться быстрым и повторяемым.
+    """
+    started = datetime.now(timezone.utc)
+    http, _fx, providers = build_runtime(config)
+    # Сам себя склад не опрашивает: иначе прочитанные вчера цены записывались бы
+    # обратно как собранные сегодня и никогда не старели.
+    parsers = [p for p in providers if p.name != CollectorProvider.name]
+    if not parsers:
+        log.warning("нет ни одного источника для сбора — включите провайдеры в конфиге")
+
+    paths = enumerate_paths(config)
+    queries = leg_queries(paths, config)
+    provider_results, legs = fetch_legs(parsers, queries, config)
+
+    policy = CollectorPolicy.from_config(config)
+    db_path = collector_db_path(config)
+    with CollectorStore(db_path) as store:
+        stored = store.put(legs, collected_at=datetime.now(timezone.utc))
+        pruned = store.prune(policy.max_age_minutes) if prune else 0
+        stats = store.stats(fresh_minutes=policy.fresh_minutes)
+
+    log.info("на склад записано %d офферов, вычищено %d", stored, pruned)
+    return CollectReport(
+        started_at=started,
+        db_path=db_path,
+        queries=queries,
+        provider_results=provider_results,
+        stored=stored,
+        pruned=pruned,
+        requests_used=http.budget.used if http.budget else 0,
+        stats=stats,
+    )
 
 
 def run_tracker(
