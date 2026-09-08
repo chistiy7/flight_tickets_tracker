@@ -118,7 +118,12 @@ def _cmd_routes(config: Config, args: argparse.Namespace) -> int:
           f"detour_factor={config.search.detour_factor})\n")
     for path in paths[: args.limit]:
         modes = " | ".join(
-            f"{a}→{b}: {'/'.join(m.value for m in edge_modes(a, b, allow_tour=(i == 0)))}"
+            f"{a}→{b}: " + "/".join(
+                m.value
+                for m in edge_modes(
+                    a, b, allow_tour=(i == 0), allow_ground=config.search.include_ground
+                )
+            )
             for i, (a, b) in enumerate(path.legs)
         )
         print(f"  {str(path):<34} крюк ×{detour_ratio(list(path.nodes)):.2f}  {modes}")

@@ -16,9 +16,19 @@ from tbs_tracker.routing.search import (
 )
 
 
-def test_paths_include_direct_hub_and_ground_corridors(base_config):
+def test_paths_are_air_only_by_default(base_config):
+    """По умолчанию ищем только авиасообщение: наземных плеч в топологии нет."""
     paths = {" → ".join(p.nodes) for p in enumerate_paths(base_config)}
     assert "MOW → TBS" in paths
+    assert "MOW → IST → TBS" in paths
+    assert "MOW → OGZ → TBS" not in paths
+    # Ереван без автобуса до Тбилиси бесполезен: рейса EVN→TBS не существует.
+    assert "MOW → EVN → TBS" not in paths
+
+
+def test_ground_paths_come_back_when_enabled(base_config):
+    base_config.search.include_ground = True
+    paths = {" → ".join(p.nodes) for p in enumerate_paths(base_config)}
     assert "MOW → OGZ → TBS" in paths
     assert "MOW → EVN → TBS" in paths
     assert "LED → OGZ → TBS" in paths
@@ -43,11 +53,17 @@ def test_edge_modes_ground_corridor_and_tour():
     assert Mode.TOUR not in edge_modes("MOW", "TBS")
 
 
+def test_edge_modes_without_ground_leave_only_flights():
+    assert edge_modes("OGZ", "TBS", allow_ground=False) == ()
+    assert edge_modes("KUT", "TBS", allow_ground=False) == ()
+    assert edge_modes("MOW", "TBS", allow_ground=False) == (Mode.AIR,)
+
+
 def test_leg_queries_extend_window_for_later_legs(base_config):
-    paths = [p for p in enumerate_paths(base_config) if p.nodes == ("MOW", "OGZ", "TBS")]
+    paths = [p for p in enumerate_paths(base_config) if p.nodes == ("MOW", "IST", "TBS")]
     queries = {(q.origin, q.destination): q for q in leg_queries(paths, base_config)}
-    first = queries[("MOW", "OGZ")]
-    second = queries[("OGZ", "TBS")]
+    first = queries[("MOW", "IST")]
+    second = queries[("IST", "TBS")]
     assert second.date_to > first.date_to
 
 
@@ -130,6 +146,7 @@ def test_overnight_layover_is_charged(base_config):
 
 
 def test_assemble_prefers_cheap_ground_chain(base_config):
+    base_config.search.include_ground = True
     depart = datetime(2026, 10, 5, 9, 20, tzinfo=TZ_MOW)
     legs_by_edge = {
         ("MOW", "TBS"): [

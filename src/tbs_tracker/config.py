@@ -54,6 +54,10 @@ class SearchConfig:
     passengers: int = 1
     windows: list[DateWindow] = field(default_factory=list)
     top_n: int = 15
+    #: Наземные плечи (маршрутка через Верхний Ларс, автобус Ереван→Тбилиси,
+    #: поезда внутри Грузии). По умолчанию выключены: трекер ищет только
+    #: авиасообщение. Вместе с ними отключаются и цепочки класса D.
+    include_ground: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], today: date) -> "SearchConfig":
@@ -63,6 +67,7 @@ class SearchConfig:
             {
                 "origins", "destinations", "entry_points", "hubs", "max_legs",
                 "detour_factor", "passengers", "windows", "relative_windows", "top_n",
+                "include_ground",
             },
             "search",
         )

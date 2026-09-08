@@ -1,10 +1,13 @@
-# Офлайн-демо: цены берутся из файла фикстур и справочника наземных плеч,
-# сеть не используется. Запуск: tbs-tracker -c config/demo.yaml run
+# Офлайн-демо: цены берутся из файла фикстур, сеть не используется.
+# Запуск: tbs-tracker -c config/demo.yaml run
 search:
-  origins: [MOW, LED, AER, MRV, OGZ]
+  # Только авиасообщение. Наземные плечи включаются через include_ground: true
+  # вместе с провайдером ground и хабом EVN (см. закомментированные блоки ниже).
+  include_ground: false
+  origins: [MOW, LED, AER, MRV]
   destinations: [TBS]
   entry_points: [TBS, KUT, BUS]
-  hubs: [EVN, IST]
+  hubs: [IST]
   max_legs: 3
   detour_factor: 2.4
   passengers: 1
@@ -39,8 +42,10 @@ providers:
   fixtures:
     enabled: true
     path: data/fixtures/demo_offers.json
+  # Наземные плечи выключены вместе с search.include_ground. Чтобы посмотреть
+  # цепочки класса D, включите оба и верните EVN в hubs.
   ground:
-    enabled: true
+    enabled: false
     legs:
       - origin: OGZ
         destination: TBS

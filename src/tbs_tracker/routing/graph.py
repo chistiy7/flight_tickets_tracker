@@ -59,7 +59,13 @@ class RoutePath:
         return " → ".join(self.nodes)
 
 
-def edge_modes(origin: str, destination: str, *, allow_tour: bool = False) -> tuple[Mode, ...]:
+def edge_modes(
+    origin: str,
+    destination: str,
+    *,
+    allow_tour: bool = False,
+    allow_ground: bool = True,
+) -> tuple[Mode, ...]:
     """Какими способами можно проехать это плечо."""
     modes: list[Mode] = []
     pair = frozenset({origin, destination})
@@ -70,10 +76,10 @@ def edge_modes(origin: str, destination: str, *, allow_tour: bool = False) -> tu
     # Наземное плечо через границу берём только там, где коридор реально работает:
     # «близко по прямой» ничего не значит, если между городами нет перехода.
     same_country_short = a.country == b.country and distance_km(origin, destination) <= 700
-    if pair in GROUND_CORRIDORS or same_country_short:
+    if allow_ground and (pair in GROUND_CORRIDORS or same_country_short):
         modes.append(Mode.BUS)
         modes.append(Mode.TAXI)
-    if pair in TRAIN_CORRIDORS:
+    if allow_ground and pair in TRAIN_CORRIDORS:
         modes.append(Mode.TRAIN)
     if allow_tour and a.country == "RU" and b.country == "GE":
         modes.append(Mode.TOUR)
@@ -120,12 +126,21 @@ def enumerate_paths(config: Config) -> list[RoutePath]:
             return
         if len(nodes) - 1 >= search.max_legs:
             return
+        position = len(nodes) - 1
         for candidate in sorted(allowed_nodes):
             if candidate in nodes:
                 continue
-            if not _edge_allowed(current, candidate, len(nodes) - 1, config):
+            if not _edge_allowed(current, candidate, position, config):
                 continue
-            if not edge_modes(current, candidate, allow_tour=True):
+            # Пакетный тур бывает только первым плечом, поэтому и здесь позиция
+            # учитывается: иначе в топологии остаются пути, для которых потом не
+            # находится ни одного способа проехать плечо.
+            if not edge_modes(
+                current,
+                candidate,
+                allow_tour=(position == 0),
+                allow_ground=search.include_ground,
+            ):
                 continue
             walk(nodes + (candidate,))
 
@@ -146,7 +161,12 @@ def leg_queries(paths: list[RoutePath], config: Config) -> list[LegQuery]:
     queries: dict[str, LegQuery] = {}
     for path in paths:
         for position, (origin, destination) in enumerate(path.legs):
-            modes = edge_modes(origin, destination, allow_tour=(position == 0))
+            modes = edge_modes(
+                origin,
+                destination,
+                allow_tour=(position == 0),
+                allow_ground=config.search.include_ground,
+            )
             if not modes:
                 continue
             for window in config.search.windows:

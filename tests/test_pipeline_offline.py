@@ -29,28 +29,39 @@ def demo_config(tmp_path: Path) -> Config:
     return Config.load(tmp_path / "config" / "demo.yaml")
 
 
+@pytest.fixture
+def ground_demo_config(demo_config: Config) -> Config:
+    """Демо с наземными плечами: они выключены по умолчанию, но не удалены."""
+    demo_config.search.include_ground = True
+    demo_config.search.origins = [*demo_config.search.origins, "OGZ"]
+    demo_config.search.hubs = [*demo_config.search.hubs, "EVN"]
+    demo_config.providers["ground"].enabled = True
+    return demo_config
+
+
 def test_offline_run_builds_chains_and_history(demo_config):
     report = run_tracker(demo_config, notify=False)
 
     assert report.itineraries, report.stats.filtered_out
-    assert report.requests_used == 0  # фикстуры и справочник наземных плеч не ходят в сеть
+    assert report.requests_used == 0  # фикстуры не ходят в сеть
 
     paths = {" → ".join(it.path) for it in report.itineraries}
     assert "MOW → TBS" in paths
-    assert "MOW → OGZ → TBS" in paths
+    assert "MOW → IST → TBS" in paths
 
-    # Абсолютный минимум — наземное плечо из Владикавказа (он тоже в origins).
-    assert report.itineraries[0].path == ["OGZ", "TBS"]
-
-    # Из Москвы наземный коридор через Владикавказ дешевле прямого рейса.
-    ground_chain = _cheapest(report.itineraries, ["MOW", "OGZ", "TBS"])
-    direct = _cheapest(report.itineraries, ["MOW", "TBS"], mode=Mode.AIR)
-    assert ground_chain.chain_class == "D"
-    assert ground_chain.cost.out_of_pocket_rub < direct.cost.out_of_pocket_rub
+    # Минимум — прямой рейс из Сочи: наземные плечи в авиарежиме не участвуют.
+    assert report.itineraries[0].path == ["AER", "TBS"]
 
     with Store(demo_config.resolve_path(demo_config.runtime.db_path)) as store:
         assert store.history(limit=5)
         assert store.cheapest_ever(limit=3)
+
+
+def test_offline_run_is_air_only_by_default(demo_config):
+    report = run_tracker(demo_config, notify=False)
+
+    assert not [leg for leg in report.legs if leg.mode.is_ground]
+    assert "D" not in {it.chain_class for it in report.itineraries}
 
 
 def test_hot_tour_can_beat_dry_ticket(demo_config):
@@ -74,7 +85,7 @@ def _cheapest(itineraries, path, mode: Mode | None = None):
 def test_offline_run_covers_several_chain_classes(demo_config):
     report = run_tracker(demo_config, notify=False)
     classes = {it.chain_class for it in report.itineraries}
-    assert {"A", "D", "E"} <= classes
+    assert {"A", "C", "E"} <= classes
 
 
 def test_offline_run_converts_currency_of_foreign_leg(demo_config):
@@ -94,12 +105,19 @@ def test_tour_leg_is_classified_as_package(demo_config):
     assert "package_tour" in tours[0].flags
 
 
-def test_ground_provider_supplies_border_leg(demo_config):
-    report = run_tracker(demo_config, notify=False)
+def test_ground_provider_supplies_border_leg(ground_demo_config):
+    """Наземный коридор возвращается целиком, стоит включить include_ground."""
+    report = run_tracker(ground_demo_config, notify=False)
+
     ground_legs = [leg for leg in report.legs if leg.mode.is_ground]
     assert ground_legs
     assert all(leg.price_kind == PriceKind.ESTIMATE for leg in ground_legs)
     assert any(leg.origin == "OGZ" and leg.destination == "TBS" for leg in ground_legs)
+
+    ground_chain = _cheapest(report.itineraries, ["MOW", "OGZ", "TBS"])
+    direct = _cheapest(report.itineraries, ["MOW", "TBS"], mode=Mode.AIR)
+    assert ground_chain.chain_class == "D"
+    assert ground_chain.cost.out_of_pocket_rub < direct.cost.out_of_pocket_rub
 
 
 def test_dedupe_prefers_live_price_at_equal_cost(demo_config):
@@ -114,20 +132,19 @@ def test_cli_run_and_routes_offline(demo_config, capsys, monkeypatch):
     monkeypatch.chdir(demo_config.base_dir)
     assert main(["-c", "config/demo.yaml", "routes", "--queries"]) == 0
     out = capsys.readouterr().out
-    assert "MOW → OGZ → TBS" in out
+    assert "MOW → IST → TBS" in out
     assert "План запросов" in out
 
     assert main(["-c", "config/demo.yaml", "run", "--no-alerts", "--limit", "8"]) == 0
     out = capsys.readouterr().out
     assert "Источники:" in out
-    assert "MOW → OGZ → TBS" in out
+    assert "MOW → IST → TBS" in out
 
     # Без ссылки вариант бесполезен: по нему нечего покупать.
     assert "искать: https://www.aviasales.ru/search/" in out
-    assert "купить: билет у водителя или в кассе на месте" in out
 
     assert main(["-c", "config/demo.yaml", "history", "--best"]) == 0
-    assert "MOW>OGZ>TBS" in capsys.readouterr().out
+    assert "AER>TBS" in capsys.readouterr().out
 
     assert main(["-c", "config/demo.yaml", "sources"]) == 0
     assert "fixtures" in capsys.readouterr().out
