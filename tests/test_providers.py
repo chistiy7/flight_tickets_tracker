@@ -10,7 +10,7 @@ import pytest
 from tbs_tracker.config import Config, ProviderConfig
 from tbs_tracker.fx import CurrencyConverter
 from tbs_tracker.httpclient import HttpClient, RequestBudget, RequestBudgetExceeded
-from tbs_tracker.models import LegQuery, Mode, PaymentChannel, PriceKind
+from tbs_tracker.models import LegQuery, LinkKind, Mode, PaymentChannel, PriceKind
 from tbs_tracker.providers.airline_direct import AirlineDirectProvider, extract
 from tbs_tracker.providers.duffel import DuffelProvider
 from tbs_tracker.providers.ground import GroundProvider
@@ -80,6 +80,9 @@ def test_travelpayouts_parses_cached_prices(base_config, query, monkeypatch):
     assert leg.carrier == "WZ" and leg.flight_number == "WZ565"
     assert leg.price_kind == PriceKind.CACHED
     assert leg.deep_link.endswith("/MOW0610TBS1?t=abc")
+    # Кэш Aviasales ведёт в выдачу, а не в корзину — обещать «купить» нельзя.
+    assert leg.link_kind == LinkKind.SEARCH
+    assert leg.where_to_buy().startswith("искать: https://")
     assert http.calls[0][2]["origin"] == "MOW"
 
 
@@ -138,6 +141,10 @@ def test_duffel_parses_live_offer_in_eur(base_config, query, monkeypatch):
     assert leg.payment_channel == PaymentChannel.FOREIGN_CARD
     assert leg.baggage_included is True
     assert leg.flight_number == "TK378"
+    # Публичной страницы оффера у Duffel нет, поэтому вместо ссылки — его номер.
+    assert leg.deep_link is None
+    assert "off_1" in leg.booking_ref
+    assert leg.where_to_buy() == f"купить: {leg.booking_ref}"
 
 
 def test_serpapi_parses_best_and_other_flights(base_config, query, monkeypatch):
@@ -220,6 +227,22 @@ def test_tourvisor_keeps_tours_cheaper_than_their_hotel(base_config, monkeypatch
     assert legs[0].price_rub == pytest.approx(12000)
 
 
+def test_tourvisor_link_points_to_hotel_not_checkout(base_config, monkeypatch):
+    """Tourvisor отдаёт карточку отеля — выдавать её за покупку тура нельзя."""
+    monkeypatch.setenv("TV", "jwt")
+    payload = _hot_tour_payload()
+    payload[0]["hotel"]["hotelDescriptionLink"] = "https://tourvisor.ru/hotel/1"
+    provider = _tourvisor(base_config, FakeHttp(payload))
+    leg = provider.safe_fetch(_tour_query()).legs[0]
+
+    assert leg.link_kind == LinkKind.INFO
+    assert leg.deep_link == "https://tourvisor.ru/hotel/1"
+    assert "t1" in leg.booking_ref and "агент" in leg.booking_ref
+    hint = leg.where_to_buy()
+    assert hint.startswith("смотреть: https://tourvisor.ru/hotel/1")
+    assert "бронируется у агента" in hint
+
+
 def test_tourvisor_skips_without_dictionaries(base_config, monkeypatch):
     monkeypatch.setenv("TV", "jwt")
     provider = _provider(TourvisorProvider, base_config, {"token_env": "TV"}, FakeHttp([]))
@@ -256,6 +279,9 @@ def test_airline_direct_extracts_by_configured_paths(base_config, query):
     assert leg.price_kind == PriceKind.LIVE
     assert leg.source == "airline_direct:A4"
     assert leg.deep_link == "https://azimuth.aero/"
+    # Сайт перевозчика — единственная ссылка, ведущая прямо к покупке.
+    assert leg.link_kind == LinkKind.BOOKING
+    assert leg.where_to_buy() == "купить: https://azimuth.aero/"
 
 
 def test_airline_direct_survives_changed_schema(base_config, query):
@@ -320,6 +346,25 @@ def test_ground_provider_border_leg_adds_buffer_to_duration(base_config):
     assert len(result.legs) == 1
     assert result.legs[0].duration_min == 360
     assert result.legs[0].flexible is True
+    # Маршрутку на Ларс онлайн не продают — вместо пустоты честная подсказка.
+    assert result.legs[0].where_to_buy() == "купить: билет у водителя или в кассе на месте"
+
+
+def test_ground_provider_prefers_configured_booking_url(base_config):
+    options = {
+        "legs": [
+            {
+                "origin": "OGZ", "destination": "TBS", "mode": "bus", "price_rub": 1500,
+                "duration_min": 240, "flexible": True,
+                "url": "https://carrier.example/tickets",
+            }
+        ]
+    }
+    provider = _provider(GroundProvider, base_config, options, FakeHttp({}))
+    result = provider.safe_fetch(
+        LegQuery("OGZ", "TBS", date(2026, 10, 6), date(2026, 10, 6), modes=(Mode.BUS,))
+    )
+    assert result.legs[0].where_to_buy() == "купить: https://carrier.example/tickets"
 
 
 def test_request_budget_blocks_runaway_polling(tmp_path: Path):

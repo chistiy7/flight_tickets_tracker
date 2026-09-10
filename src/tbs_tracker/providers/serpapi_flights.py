@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
+from ..models import Leg, LegQuery, LinkKind, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import parse_dt
 from .base import Provider, now_utc, register
 
@@ -87,6 +87,9 @@ class SerpApiFlightsProvider(Provider):
                     payment_channel=PaymentChannel.RU_CARD,
                     baggage_included=False,
                     deep_link=search_link,
+                    # Google Flights — витрина: рейс там виден, но покупка уходит
+                    # к авиакомпании или в OTA.
+                    link_kind=LinkKind.SEARCH,
                     observed_at=observed,
                     notes="Google Flights (SerpApi): цена живая, покупка на стороне",
                     raw={"layovers": item.get("layovers")},

@@ -19,7 +19,7 @@ import logging
 from datetime import date
 from typing import Any
 
-from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
+from ..models import Leg, LegQuery, LinkKind, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import parse_dt
 from .base import Provider, now_utc, register
 
@@ -136,6 +136,9 @@ class AirlineDirectProvider(Provider):
                     payment_channel=PaymentChannel(str(airline.get("payment_channel", "ru_card"))),
                     baggage_included=bool(airline.get("baggage_included", False)),
                     deep_link=airline.get("booking_url"),
+                    # Сайт перевозчика — единственный источник, где ссылка ведёт
+                    # прямо к покупке без посредников.
+                    link_kind=LinkKind.BOOKING,
                     observed_at=observed,
                     notes=f"прямая продажа {airline.get('name') or airline.get('carrier')}",
                     raw={},

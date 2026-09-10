@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
+from ..models import Leg, LegQuery, LinkKind, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import parse_dt
 from .base import Provider, now_utc, register
 
@@ -84,6 +84,7 @@ class DuffelProvider(Provider):
                 continue
             carrier = (offer.get("owner") or {}).get("iata_code")
             baggage = _has_checked_bag(segments)
+            offer_id = offer.get("id")
             legs.append(
                 Leg(
                     origin=query.origin,
@@ -101,10 +102,18 @@ class DuffelProvider(Provider):
                     price_kind=PriceKind.LIVE,
                     payment_channel=PaymentChannel.FOREIGN_CARD,
                     baggage_included=baggage,
+                    # У Duffel нет публичной страницы оффера: бронь создаётся
+                    # запросом к API по его идентификатору.
                     deep_link=None,
+                    booking_ref=(
+                        f"оффер Duffel {offer_id} — бронируется через API, "
+                        "офферы живут ~20 минут"
+                        if offer_id
+                        else "бронирование через API Duffel"
+                    ),
                     observed_at=observed,
                     notes="живой оффер Duffel; оплата иностранной картой",
-                    raw={"offer_id": offer.get("id")},
+                    raw={"offer_id": offer_id},
                 )
             )
         return legs

@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..models import Leg, LegQuery, Mode, PaymentChannel, PriceKind, ProviderResult
+from ..models import Leg, LegQuery, LinkKind, Mode, PaymentChannel, PriceKind, ProviderResult
 from ..timeutil import parse_dt
 from .base import Provider, now_utc, register
 
@@ -80,6 +80,8 @@ class FixturesProvider(Provider):
                     nights_included=nights,
                     return_flight_included=return_included,
                     deep_link=item.get("deep_link"),
+                    link_kind=LinkKind(str(item.get("link_kind", "search"))),
+                    booking_ref=item.get("booking_ref"),
                     observed_at=observed,
                     notes=item.get("notes"),
                     raw={},

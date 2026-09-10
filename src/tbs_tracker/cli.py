@@ -35,6 +35,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_cmd = sub.add_parser("run", help="прогон: цены, цепочки, алерты")
     run_cmd.add_argument("--limit", type=int, default=None, help="сколько вариантов показать")
+    run_cmd.add_argument(
+        "--details",
+        type=int,
+        default=3,
+        help="для скольких вариантов расписать плечи и ссылки на покупку",
+    )
     run_cmd.add_argument("--json", action="store_true", help="вывести результат в JSON")
     run_cmd.add_argument("--no-alerts", action="store_true", help="не отправлять уведомления")
     run_cmd.add_argument("--no-store", action="store_true", help="не писать историю в БД")
@@ -97,6 +103,7 @@ def _cmd_run(config: Config, args: argparse.Namespace) -> int:
                 report.stats,
                 report.provider_results,
                 limit=limit,
+                details=args.details,
             )
         )
         print(f"\nЗапросов израсходовано: {report.requests_used}")
@@ -111,7 +118,12 @@ def _cmd_routes(config: Config, args: argparse.Namespace) -> int:
           f"detour_factor={config.search.detour_factor})\n")
     for path in paths[: args.limit]:
         modes = " | ".join(
-            f"{a}→{b}: {'/'.join(m.value for m in edge_modes(a, b, allow_tour=(i == 0)))}"
+            f"{a}→{b}: " + "/".join(
+                m.value
+                for m in edge_modes(
+                    a, b, allow_tour=(i == 0), allow_ground=config.search.include_ground
+                )
+            )
             for i, (a, b) in enumerate(path.legs)
         )
         print(f"  {str(path):<34} крюк ×{detour_ratio(list(path.nodes)):.2f}  {modes}")
