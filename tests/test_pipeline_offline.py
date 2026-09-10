@@ -138,7 +138,7 @@ def test_cli_run_and_routes_offline(demo_config, capsys, monkeypatch):
     assert main(["-c", "config/demo.yaml", "run", "--no-alerts", "--limit", "8"]) == 0
     out = capsys.readouterr().out
     assert "Источники:" in out
-    assert "MOW → IST → TBS" in out
+    assert "Москва → Стамбул (IST) → Тбилиси" in out
 
     # Без ссылки вариант бесполезен: по нему нечего покупать.
     assert "искать: https://www.aviasales.ru/search/" in out

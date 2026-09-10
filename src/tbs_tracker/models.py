@@ -142,6 +142,8 @@ class Leg:
         return self.depart.date() if self.depart else None
 
     def describe(self) -> str:
+        from .geo import format_route
+
         if self.depart is None:
             when = "по заполнению"
         elif self.flexible:
@@ -151,7 +153,8 @@ class Leg:
         who = self.carrier or self.mode.value
         if self.flight_number:
             who = f"{who} {self.flight_number}"
-        return f"{self.origin}→{self.destination} {when} {who} {self.price_rub:.0f}₽"
+        route = format_route([self.origin, self.destination], sep="→")
+        return f"{route} {when} {who} {self.price_rub:.0f}₽"
 
     def where_to_buy(self) -> str:
         """Где купить именно это плечо.

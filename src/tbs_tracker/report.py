@@ -6,6 +6,7 @@ import json
 from typing import Any, Iterable, Sequence
 
 from .config import Config
+from .geo import format_route
 from .models import Itinerary, ProviderResult
 from .routing.search import SearchStats, cheapest_by_class, pareto_front
 from .timeutil import fmt_dt, fmt_duration
@@ -44,18 +45,20 @@ def render_table(
         return "Ничего не найдено."
     if one_per_route:
         itineraries = best_variants(itineraries)
+    shown = list(itineraries[:limit])
+    routes = [format_route(it.path) for it in shown]
+    route_w = max([26, len("Маршрут")] + [len(route) for route in routes])
     header = (
-        f"{'Маршрут':<26}{'Вылет':<13}{'В пути':<10}{'Цена':>10}"
+        f"{'Маршрут':<{route_w}}  {'Вылет':<13}{'В пути':<10}{'Цена':>10}"
         f"{'Заплатить':>11}{'Кл':>4}  Источники / флаги"
     )
     lines = [header, "-" * len(header)]
-    for itinerary in itineraries[:limit]:
-        route = " → ".join(itinerary.path)
+    for itinerary, route in zip(shown, routes):
         extras = ", ".join(itinerary.sources)
         if itinerary.flags:
             extras = f"{extras} | {', '.join(itinerary.flags)}"
         lines.append(
-            f"{route:<26}{fmt_dt(itinerary.depart):<13}"
+            f"{route:<{route_w}}  {fmt_dt(itinerary.depart):<13}"
             f"{fmt_duration(itinerary.total_duration_min):<10}"
             f"{itinerary.tickets_rub:>10.0f}"
             f"{itinerary.cost.out_of_pocket_rub:>11.0f}"
@@ -66,7 +69,7 @@ def render_table(
 
 def render_details(itinerary: Itinerary) -> str:
     lines = [
-        f"{' → '.join(itinerary.path)} | класс {itinerary.chain_class} "
+        f"{format_route(itinerary.path)} | класс {itinerary.chain_class} "
         f"({CLASS_TITLES.get(itinerary.chain_class, '')})",
         f"вылет {fmt_dt(itinerary.depart)}, прилёт {fmt_dt(itinerary.arrive)}, "
         f"в пути {fmt_duration(itinerary.total_duration_min)}",
@@ -129,7 +132,7 @@ def render_run_report(
             itinerary = best_by_class[chain_class]
             lines.append(
                 f"  {chain_class} ({CLASS_TITLES.get(chain_class, '')}): "
-                f"{' → '.join(itinerary.path)} — {itinerary.cost.out_of_pocket_rub:.0f}₽, "
+                f"{format_route(itinerary.path)} — {itinerary.cost.out_of_pocket_rub:.0f}₽, "
                 f"{fmt_duration(itinerary.total_duration_min)}"
             )
         blocks.append("\n".join(lines))
@@ -139,7 +142,7 @@ def render_run_report(
     cheapest = min(itineraries, key=lambda it: it.cost.out_of_pocket_rub)
     if cheapest is not itineraries[0]:
         blocks.append(
-            f"\nМинимум по фактической оплате: {' → '.join(cheapest.path)} — "
+            f"\nМинимум по фактической оплате: {format_route(cheapest.path)} — "
             f"{cheapest.cost.out_of_pocket_rub:.0f}₽, "
             f"{fmt_duration(cheapest.total_duration_min)}, класс {cheapest.chain_class}"
         )
@@ -151,7 +154,7 @@ def render_run_report(
             lines.append(
                 f"  {itinerary.cost.out_of_pocket_rub:>8.0f}₽  "
                 f"{fmt_duration(itinerary.total_duration_min):<10} "
-                f"{' → '.join(itinerary.path)}"
+                f"{format_route(itinerary.path)}"
             )
         blocks.append("\n".join(lines))
 
@@ -211,6 +214,7 @@ def render_json(itineraries: Sequence[Itinerary]) -> str:
     payload = [
         {
             "route": itinerary.path,
+            "route_label": format_route(itinerary.path),
             "chain_class": itinerary.chain_class,
             "depart": itinerary.depart.isoformat() if itinerary.depart else None,
             "arrive": itinerary.arrive.isoformat() if itinerary.arrive else None,

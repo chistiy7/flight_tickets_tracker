@@ -103,6 +103,8 @@ def _in_cooldown(store: Store, route_key: str, kind: str, cooldown_hours: int,
 
 
 def _render(itinerary: Itinerary, reason: str) -> str:
+    from .geo import format_route
+
     first = itinerary.legs[0]
     when = (
         f"{itinerary.depart:%d.%m} (по заполнению)"
@@ -110,7 +112,7 @@ def _render(itinerary: Itinerary, reason: str) -> str:
         else fmt_dt(itinerary.depart)
     )
     lines = [
-        f"{itinerary.route_key} — {itinerary.cost.out_of_pocket_rub:.0f}₽ "
+        f"{format_route(itinerary.path)} — {itinerary.cost.out_of_pocket_rub:.0f}₽ "
         f"(билеты {itinerary.tickets_rub:.0f}₽), класс {itinerary.chain_class}",
         f"причина: {reason}",
         f"старт {when}, в пути {fmt_duration(itinerary.total_duration_min)}",

@@ -139,6 +139,19 @@ def place(code: str) -> Place:
         raise KeyError(f"Неизвестный код города: {code}") from exc
 
 
+def place_name(code: str) -> str:
+    """Человекочитаемое имя города для отчётов; неизвестный код оставляем как есть."""
+    try:
+        return place(code).name
+    except KeyError:
+        return code
+
+
+def format_route(codes: list[str] | tuple[str, ...], *, sep: str = " → ") -> str:
+    """Маршрут вида «Сочи → Тбилиси» вместо «AER → TBS»."""
+    return sep.join(place_name(code) for code in codes)
+
+
 def distance_km(code_a: str, code_b: str) -> float:
     """Ортодромия между городами (для detour-фильтра)."""
     a, b = place(code_a), place(code_b)

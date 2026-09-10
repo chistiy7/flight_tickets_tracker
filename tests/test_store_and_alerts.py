@@ -44,7 +44,7 @@ def test_alert_fires_on_target_price_then_cools_down(base_config, tmp_path):
 
         first = evaluate([itinerary], store, base_config, run_id=run_id)
         assert [a.kind for a in first] == ["target"]
-        assert "MOW>OGZ>TBS" in first[0].message
+        assert "Москва → Владикавказ → Тбилиси" in first[0].message
 
         # Повторный прогон в пределах cooldown не должен дублировать алерт.
         again = evaluate([itinerary], store, base_config, run_id=run_id)
